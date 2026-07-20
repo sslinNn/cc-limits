@@ -1,0 +1,8 @@
+{
+  "name": "cc-limits",
+  "description": "Statusline showing Claude Code 5h/7-day rate-limit usage and context window usage in realtime.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sslinNn"
+  }
+}

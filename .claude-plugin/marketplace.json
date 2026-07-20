@@ -1,0 +1,13 @@
+{
+  "name": "cc-limits",
+  "owner": {
+    "name": "sslinNn"
+  },
+  "plugins": [
+    {
+      "name": "cc-limits",
+      "source": "./plugin",
+      "description": "Statusline showing Claude Code 5h/7-day rate-limit usage and context window usage in realtime."
+    }
+  ]
+}

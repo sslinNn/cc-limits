@@ -10,8 +10,11 @@ All data comes from Claude Code's built-in [statusline JSON](https://code.claude
 
 ```
 [Sonnet] 📁 my-project | 🌿 main
+
 ctx ▓▓▓░░░░░░░ 32%
+
 5h  ▓▓░░░░░░░░ 18% (2h0m until reset)
+
 7d  ▓▓▓▓░░░░░░ 41%
 ```
 

@@ -1,5 +1,7 @@
 # cc-limits
 
+[![Listed on ClaudePluginHub](https://www.claudepluginhub.com/badge/sslinnn-cc-limits-plugin)](https://www.claudepluginhub.com/plugins/sslinnn-cc-limits-plugin?ref=badge)
+
 A Claude Code statusline plugin that shows, in realtime:
 
 - **context** — how much of the current session's context window is used

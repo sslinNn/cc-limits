@@ -34,18 +34,25 @@ Colors: green (<70%), yellow (70-89%), red (≥90%) per bar.
 /plugin install cc-limits@cc-limits
 ```
 
-Start a new session (or restart Claude Code) so the plugin's `SessionStart` hook copies its script to `~/.claude/cc-limits-statusline.js`.
+Start a new session (or restart Claude Code). The plugin's `SessionStart` hook copies its script to `~/.claude/cc-limits-statusline.js` and configures `~/.claude/settings.json` for you automatically — no manual editing required.
 
-Then add this to your `~/.claude/settings.json` — this one manual step is required because Claude Code's `statusLine` command can't currently reference a plugin's own install path directly, only hooks/MCP/LSP commands can:
+If you already have a different `statusLine` configured, cc-limits leaves it untouched and just lets you know (with a ready-to-paste snippet) in case you want to switch to it yourself.
 
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "node ~/.claude/cc-limits-statusline.js"
-  }
-}
-```
+## Customization
+
+Run `/cc-limits:setup` any time to interactively customize colors, thresholds, which segments show and in what order, icons, and bar style — just answer the questions, no file editing required.
+
+Defaults:
+
+| Setting | Default |
+|---|---|
+| Segments (in order) | header (model, dir, git branch), ctx, 5h, 7d |
+| Colors | green (`<70%`), yellow (`70-89%`), red (`≥90%`) |
+| Bar | width 10, `▓` filled / `░` empty |
+| Reset-time-until | shown for 5h, hidden for 7d |
+| Icons | 📁 for the directory, 🌿 for the git branch |
+
+Advanced: the config lives at `~/.claude/cc-limits-config.json` as plain JSON matching the schema `/cc-limits:setup` writes, if you'd rather edit it directly.
 
 ## Update
 

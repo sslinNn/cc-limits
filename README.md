@@ -249,6 +249,8 @@ Prefer editing JSON directly? The config is plain JSON at `~/.claude/cc-limits-c
 
 The `SessionStart` hook re-copies the script next session, so `~/.claude/cc-limits-statusline.js` always matches the installed version.
 
+What changed between versions is in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT

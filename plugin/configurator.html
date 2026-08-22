@@ -1,0 +1,1031 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cc-limits Configurator</title>
+</head>
+<body>
+<!-- artifact:start -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #eef0f4;
+    --panel: #ffffff;
+    --panel-sunk: #f7f8fa;
+    --ink: #1b1f27;
+    --ink-soft: #4a5361;
+    --muted: #6d7787;
+    --line: #dce0e8;
+    --line-strong: #c3cad6;
+    --accent: #3552c9;
+    --accent-soft: #e7ebfb;
+    --term-bg: #14171c;
+    --term-fg: #c6ccd6;
+    --term-dim: #6f7a8a;
+    --term-green: #4bcf82;
+    --term-yellow: #e0b341;
+    --term-red: #f0706a;
+    --term-blue: #6b9bf5;
+    --term-magenta: #c48ae8;
+    --term-cyan: #4fc4cf;
+    --term-white: #e8ecf2;
+    --radius: 6px;
+    --shadow: 0 1px 2px rgba(20, 26, 40, .06), 0 8px 24px -16px rgba(20, 26, 40, .3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0e1116;
+      --panel: #161a21;
+      --panel-sunk: #11151b;
+      --ink: #e3e7ee;
+      --ink-soft: #b3bbc8;
+      --muted: #8791a1;
+      --line: #262c36;
+      --line-strong: #39414e;
+      --accent: #8ba4ff;
+      --accent-soft: #1d2436;
+      --term-bg: #0a0d11;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0e1116;
+    --panel: #161a21;
+    --panel-sunk: #11151b;
+    --ink: #e3e7ee;
+    --ink-soft: #b3bbc8;
+    --muted: #8791a1;
+    --line: #262c36;
+    --line-strong: #39414e;
+    --accent: #8ba4ff;
+    --accent-soft: #1d2436;
+    --term-bg: #0a0d11;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 15px/1.55 "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  header.page {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 16px;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  h1 {
+    margin: 0;
+    font: 600 26px/1.15 "Archivo", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; color: var(--muted); font-size: 14px; max-width: 62ch; }
+
+  .path {
+    font: 500 12px/1 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--ink-soft);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 6px 9px;
+  }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 24px; align-items: start; }
+  @media (max-width: 980px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+  .side { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 16px; }
+  @media (max-width: 980px) { .side { position: static; } }
+
+  section.card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+
+  .card > h2 {
+    margin: 0;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line);
+    font: 600 11px/1 "Archivo", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card > h2 .hint { font: 400 11px/1.3 "IBM Plex Sans", sans-serif; letter-spacing: 0; text-transform: none; color: var(--muted); }
+
+  .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .note { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .note code { font: 500 12px/1 "IBM Plex Mono", monospace; color: var(--ink-soft); }
+
+  /* segment rows -------------------------------------------------------- */
+
+  .seg {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--panel-sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .seg[data-off="true"] { opacity: .5; }
+  .seg .name { font: 500 13.5px/1.2 "IBM Plex Sans", sans-serif; }
+  .seg .what { display: block; font-size: 11.5px; color: var(--muted); }
+  .seg .move { display: flex; gap: 3px; }
+
+  /* controls ------------------------------------------------------------ */
+
+  label.check { display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; cursor: pointer; }
+  label.check span.desc { color: var(--muted); font-size: 12px; display: block; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 14px; }
+
+  input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; margin-top: 2px; flex: none; }
+  input[type="range"] { accent-color: var(--accent); width: 100%; }
+
+  input[type="text"], input[type="number"], select {
+    font: 400 13px/1.3 "IBM Plex Sans", sans-serif;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  input.mono { font-family: "IBM Plex Mono", monospace; }
+  input[type="number"] { font-variant-numeric: tabular-nums; }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field > .lbl { font: 500 11px/1 "Archivo", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  button {
+    font: 500 13px/1 "IBM Plex Sans", sans-serif;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.08); color: #fff; }
+  :root[data-theme="dark"] button.primary, :root:not([data-theme="light"]) button.primary { color: #10141c; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) button.primary { color: #fff; } }
+
+  button.tiny { padding: 3px 7px; font-size: 12px; font-family: "IBM Plex Mono", monospace; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* preview ------------------------------------------------------------- */
+
+  .term {
+    background: var(--term-bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    overflow-x: auto;
+    font: 400 13px/1.75 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--term-fg);
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .term .g { color: var(--term-green); }
+  .term .y { color: var(--term-yellow); }
+  .term .r { color: var(--term-red); }
+  .term .b { color: var(--term-blue); }
+  .term .m { color: var(--term-magenta); }
+  .term .c { color: var(--term-cyan); }
+  .term .w { color: var(--term-white); }
+  .term .dim { color: var(--term-dim); }
+  .term .empty { color: var(--term-dim); font-style: italic; }
+  .term a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    background: var(--panel-sunk);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+    font: 400 12px/1 "IBM Plex Mono", monospace;
+    color: var(--muted);
+  }
+
+  .titlebar + .term { border-radius: 0 0 var(--radius) var(--radius); }
+  .dots { display: flex; gap: 5px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+
+  .sliders { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; }
+  .sliders .lbl { font: 500 12px/1 "IBM Plex Mono", monospace; color: var(--ink-soft); }
+  .sliders .val { font: 500 12px/1 "IBM Plex Mono", monospace; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+
+  pre.json {
+    margin: 0;
+    padding: 14px 16px;
+    background: var(--panel-sunk);
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: auto;
+    max-height: 320px;
+    font: 400 12px/1.65 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--ink-soft);
+    tab-size: 2;
+  }
+
+  .copied { color: var(--accent); font-size: 12px; }
+
+  textarea {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--ink);
+    background: var(--panel-sunk);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 8px;
+    width: 100%;
+  }
+
+  details > summary { font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  details > summary:hover { color: var(--accent); }
+
+  .ok { color: var(--term-green); }
+  .bad { color: var(--term-red); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <h1>cc-limits Configurator</h1>
+    <p class="lede">Every option the statusline reads, with a live preview. Nothing here touches your machine — you copy the result into the config file yourself.</p>
+    <span class="path">~/.claude/cc-limits-config.json</span>
+  </header>
+
+  <div class="cols">
+    <div class="main">
+
+      <section class="card">
+        <h2>Segments <span class="hint">order top to bottom · a segment can share a line with the one above</span></h2>
+        <div class="body">
+          <div id="segments" class="body" style="padding: 0; gap: 8px;"></div>
+          <p class="note">A hidden segment is written as <code>"show": false</code> rather than dropped, so it keeps its settings for later.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Header line</h2>
+        <div class="body" id="header-parts"></div>
+      </section>
+
+      <section class="card">
+        <h2>Bars</h2>
+        <div class="body">
+          <div class="grid2">
+            <label class="check"><input type="checkbox" id="ctx-usage" checked><span>Token counts on the context bar<span class="desc">64K/200K</span></span></label>
+            <label class="check"><input type="checkbox" id="h5-reset" checked><span>5h: time until reset<span class="desc">(2h1m until reset)</span></span></label>
+            <label class="check"><input type="checkbox" id="h5-eta" checked><span>5h: estimated time to limit<span class="desc">measured from how fast the window fills</span></span></label>
+            <label class="check"><input type="checkbox" id="d7-reset" checked><span>7d: time until reset<span class="desc">(6d3h until reset)</span></span></label>
+            <label class="check"><input type="checkbox" id="d7-eta"><span>7d: estimated time to limit<span class="desc">rarely useful — a week fills slowly</span></span></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Stats line</h2>
+        <div class="body" id="stats-parts"></div>
+      </section>
+
+      <section class="card">
+        <h2>Colors &amp; thresholds</h2>
+        <div class="body">
+          <label class="check"><input type="checkbox" id="colors-on" checked><span>Color the bars by usage</span></label>
+          <div class="grid2">
+            <div class="field"><span class="lbl">Warn at</span><input type="number" id="th-yellow" min="0" max="100" value="70"></div>
+            <div class="field"><span class="lbl">Alarm at</span><input type="number" id="th-red" min="0" max="100" value="90"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><span class="lbl">Below warn</span><select id="col-low"></select></div>
+            <div class="field"><span class="lbl">Warn</span><select id="col-med"></select></div>
+            <div class="field"><span class="lbl">Alarm</span><select id="col-high"></select></div>
+          </div>
+          <p class="note" id="th-warning" hidden>Warn must be lower than alarm — the alarm color would never show.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Bar style</h2>
+        <div class="body">
+          <div class="grid2">
+            <div class="field"><span class="lbl">Width</span><input type="number" id="bar-width" min="4" max="40" value="10"></div>
+            <div class="field"><span class="lbl">Filled</span><input type="text" class="mono" id="bar-filled" maxlength="2" value="▓"></div>
+            <div class="field"><span class="lbl">Empty</span><input type="text" class="mono" id="bar-empty" maxlength="2" value="░"></div>
+            <div class="field"><span class="lbl">Stale marker</span><input type="text" class="mono" id="bar-stale" maxlength="2" value="~"></div>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button class="tiny" data-bar="▓|░">▓░ shade</button>
+            <button class="tiny" data-bar="█|░">█░ solid</button>
+            <button class="tiny" data-bar="━|─">━─ rule</button>
+            <button class="tiny" data-bar="#|-">#- ascii</button>
+            <button class="tiny" data-bar="●|○">●○ dots</button>
+          </div>
+          <div class="field"><span class="lbl">Joiner for segments sharing a line</span><input type="text" class="mono" id="joiner" value=" │ "></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Remembered limits <span class="hint">~/.claude/cc-limits-state.json</span></h2>
+        <div class="body">
+          <label class="check"><input type="checkbox" id="state-on" checked><span>Remember the last limits between sessions<span class="desc">Claude Code only sends rate limits after a session's first API response. Without this the 5h/7d bars stay blank until then.</span></span></label>
+          <div class="field" style="max-width: 220px;"><span class="lbl">Trust a remembered value for</span><input type="number" id="state-age" min="5" max="10080" value="720"> </div>
+          <p class="note">Minutes. A value is also dropped the moment its own window resets. The same file holds the sample history that turns the <code>to limit</code> estimate into a measurement.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Terminal title</h2>
+        <div class="body">
+          <label class="check"><input type="checkbox" id="title-on"><span>Write the numbers to the terminal title<span class="desc">Visible when Claude Code sits in a background tab. Does nothing on Windows or without a controlling terminal.</span></span></label>
+          <div class="field"><span class="lbl">Template</span><input type="text" class="mono" id="title-tpl" value="ctx {ctx}% · 5h {5h}% · {dir}"></div>
+          <p class="note">Placeholders: <code>{ctx}</code> <code>{5h}</code> <code>{7d}</code> <code>{cost}</code> <code>{dir}</code> <code>{model}</code></p>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="side">
+      <section class="card" style="margin: 0;">
+        <h2>Preview</h2>
+        <div class="body">
+          <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><span id="term-title">cc-limits</span></div>
+          <div class="term" id="preview"></div>
+          <div class="sliders">
+            <span class="lbl">ctx</span><input type="range" id="s-ctx" min="0" max="100" value="32"><span class="val" id="v-ctx">32%</span>
+            <span class="lbl">5h</span><input type="range" id="s-5h" min="0" max="100" value="18"><span class="val" id="v-5h">18%</span>
+            <span class="lbl">7d</span><input type="range" id="s-7d" min="0" max="100" value="41"><span class="val" id="v-7d">41%</span>
+          </div>
+          <label class="check"><input type="checkbox" id="p-stale"><span>Show a session before limits arrive<span class="desc">remembered values, marked stale</span></span></label>
+          <label class="check"><input type="checkbox" id="p-worktree"><span>Show a worktree session</span></label>
+        </div>
+      </section>
+
+      <section class="card" style="margin: 0;">
+        <h2>Apply it
+          <span style="display: flex; gap: 8px; align-items: center;">
+            <span class="copied" id="copied" hidden>Copied</span>
+            <button class="primary" id="send">Copy command</button>
+          </span>
+        </h2>
+        <div class="body">
+          <p class="note">Paste it into Claude Code and it writes the config for you — no file editing, no restart.</p>
+          <pre class="json" id="command" style="border-radius: var(--radius); max-height: 120px;"></pre>
+          <details>
+            <summary>Rather handle the file yourself?</summary>
+            <div class="body" style="padding: 12px 0 0;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="copy">Copy raw JSON</button>
+                <span class="note">save as <code>~/.claude/cc-limits-config.json</code></span>
+              </div>
+              <pre class="json" id="json" style="border-radius: var(--radius);"></pre>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="card" style="margin: 0;">
+        <h2>Start from your current config</h2>
+        <div class="body">
+          <p class="note">Ask Claude Code to <code>show my cc-limits config</code>, paste it here, and every control below jumps to your settings.</p>
+          <textarea id="load-input" rows="3" placeholder='{ "colorsEnabled": true, ... }' style="font: 400 12px/1.5 'IBM Plex Mono', monospace; resize: vertical;"></textarea>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button id="load">Load</button>
+            <span class="note" id="load-status"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const PALETTE = ["green", "yellow", "red", "blue", "magenta", "cyan", "white"];
+  const CLASS = { green: "g", yellow: "y", red: "r", blue: "b", magenta: "m", cyan: "c", white: "w" };
+
+  // Demo payload the preview renders against. Token counts and the burn rate follow the
+  // context slider so the numbers stay consistent with each other, the way they do live.
+  const DEMO = {
+    model: "Opus 5",
+    effort: "H",
+    dir: "cc-limits",
+    branch: "main",
+    ahead: 2,
+    behind: 0,
+    worktree: "feat-parser",
+    contextSize: 200000,
+    outputTokens: 1000,
+    costUsd: 1.234,
+    durationMs: 3600000,
+    apiMs: 1200000,
+    linesAdded: 320,
+    linesRemoved: 85,
+    reset5h: 7260,      // seconds
+    reset7d: 530000,
+  };
+
+  const SEGMENT_META = {
+    header: { name: "Header", what: "model, directory, branch, worktree" },
+    ctx: { name: "Context", what: "context window usage" },
+    "5h": { name: "5-hour limit", what: "rate limit + reset + ETA" },
+    "7d": { name: "Weekly limit", what: "rate limit + reset" },
+    stats: { name: "Stats", what: "cost, duration, burn rate, lines" },
+  };
+
+  const HEADER_PARTS = [
+    { key: "model", name: "Model", icon: null, opts: [["effort", "Effort tier and fast mode", "(H) · ↯"]] },
+    { key: "dir", name: "Directory", icon: "📁", opts: [["link", "Clickable link to the folder", null]] },
+    { key: "branch", name: "Git branch", icon: "🌿", opts: [["aheadBehind", "Ahead/behind upstream", "↑2↓1"], ["link", "Clickable link to the remote branch", "one extra git call per render"]] },
+    { key: "worktree", name: "Worktree name", icon: "🌳", opts: [] },
+  ];
+
+  const STATS_PARTS = [
+    { key: "cost", name: "Session cost", icon: null, sample: "$1.23" },
+    { key: "duration", name: "Duration", icon: "⏱", sample: "1h0m" },
+    { key: "burn", name: "Burn rate", icon: "🔥", sample: "1.1K/min" },
+    { key: "lines", name: "Lines changed", icon: null, sample: "+320 -85" },
+    { key: "apiTime", name: "API time share", icon: null, sample: "api 33%" },
+  ];
+
+  // Mutable UI state, seeded with the statusline's own defaults.
+  const state = {
+    order: ["header", "ctx", "5h", "7d", "stats"],
+    headerOrder: ["model", "dir", "branch", "worktree"],
+    statsOrder: ["cost", "duration", "burn", "lines", "apiTime"],
+    show: { header: true, ctx: true, "5h": true, "7d": true, stats: true },
+    row: { header: "", ctx: "", "5h": "", "7d": "", stats: "" },
+    header: {
+      model: { on: true, effort: true },
+      dir: { on: true, icon: "📁", link: false },
+      branch: { on: true, icon: "🌿", aheadBehind: true, link: false },
+      worktree: { on: true, icon: "🌳" },
+    },
+    stats: {
+      cost: { on: true, icon: "" },
+      duration: { on: true, icon: "⏱" },
+      burn: { on: true, icon: "🔥" },
+      lines: { on: true, icon: "" },
+      apiTime: { on: false, icon: "" },
+    },
+  };
+
+  const $ = id => document.getElementById(id);
+  const ordered = (list, order) => order.map(key => list.find(p => p.key === key)).filter(Boolean);
+  const el = (tag, props = {}, kids = []) => {
+    const node = Object.assign(document.createElement(tag), props);
+    for (const kid of [].concat(kids)) node.append(kid);
+    return node;
+  };
+
+  // --- statusline logic, ported so the preview matches the real renderer ----
+
+  const clampPct = pct => Math.min(100, Math.max(0, Math.round(pct)));
+
+  function bar(pct, width, filled, empty) {
+    const n = Math.max(0, Math.min(width, Math.round((pct / 100) * width)));
+    return filled.repeat(n) + empty.repeat(width - n);
+  }
+
+  function colorName(pct, thresholds, colors) {
+    if (pct >= thresholds.red) return colors.high;
+    if (pct >= thresholds.yellow) return colors.medium;
+    return colors.low;
+  }
+
+  function formatTokens(tokens) {
+    const abs = Math.abs(tokens);
+    if (abs >= 1e6) { const v = tokens / 1e6; return `${Math.abs(v) >= 10 ? Math.round(v) : v.toFixed(1)}M`; }
+    if (abs >= 1e3) { const v = tokens / 1e3; return `${Math.abs(v) >= 10 ? Math.round(v) : v.toFixed(1)}K`; }
+    return String(Math.round(tokens));
+  }
+
+  function formatDurationMs(ms) {
+    if (!(ms > 0)) return "0s";
+    if (ms < 60000) return `${Math.floor(ms / 1000)}s`;
+    const total = Math.floor(ms / 60000);
+    const d = Math.floor(total / 1440);
+    const h = Math.floor((total % 1440) / 60);
+    const m = total % 60;
+    if (d > 0) return `${d}d${h}h`;
+    if (h > 0) return `${h}h${m}m`;
+    return `${m}m`;
+  }
+
+  function depletionEta(pct, durationMs) {
+    if (pct < 1) return null;
+    const minutes = durationMs / 60000;
+    const rate = pct / minutes;
+    if (rate < 0.01) return null;
+    const remaining = (100 - pct) / rate;
+    if (remaining > 24 * 60) return null;
+    return formatDurationMs(remaining * 60000);
+  }
+
+  // --- reading the form ----------------------------------------------------
+
+  function readConfig() {
+    const yellow = Number($("th-yellow").value) || 0;
+    const red = Number($("th-red").value) || 0;
+    $("th-warning").hidden = yellow < red;
+
+    return {
+      colorsEnabled: $("colors-on").checked,
+      thresholds: { yellow, red },
+      colors: { low: $("col-low").value, medium: $("col-med").value, high: $("col-high").value },
+      bar: {
+        width: Math.min(40, Math.max(4, Number($("bar-width").value) || 10)),
+        filledChar: $("bar-filled").value || "▓",
+        emptyChar: $("bar-empty").value || "░",
+        staleMarker: $("bar-stale").value || "~",
+      },
+      layout: { joiner: $("joiner").value },
+      git: { timeoutMs: 250 },
+      state: {
+        enabled: $("state-on").checked,
+        minSampleSeconds: 30,
+        maxHistory: 60,
+        maxAgeMinutes: Math.max(5, Number($("state-age").value) || 720),
+      },
+      terminalTitle: { enabled: $("title-on").checked, template: $("title-tpl").value },
+      showUsage: $("ctx-usage").checked,
+      reset5h: $("h5-reset").checked,
+      eta5h: $("h5-eta").checked,
+      reset7d: $("d7-reset").checked,
+      eta7d: $("d7-eta").checked,
+    };
+  }
+
+  function segmentsJson(cfg) {
+    const withRow = (obj, id) => (state.row[id] === "" ? obj : { ...obj, row: Number(state.row[id]) });
+
+    const build = {
+      header: () => withRow({
+        id: "header", type: "header", show: state.show.header,
+        parts: ordered(HEADER_PARTS, state.headerOrder).filter(p => state.header[p.key].on).map(p => {
+          const s = state.header[p.key];
+          const part = { key: p.key };
+          if (p.key === "model") { part.bracket = true; part.effort = s.effort; }
+          if (p.icon) part.icon = s.icon;
+          if (p.key !== "model") part.separator = p.key === "dir" ? " " : " | ";
+          if ("link" in s) part.link = s.link;
+          if ("aheadBehind" in s) part.aheadBehind = s.aheadBehind;
+          return part;
+        }),
+      }, "header"),
+
+      ctx: () => withRow({
+        id: "ctx", type: "bar", show: state.show.ctx, label: "ctx",
+        source: "context_window.used_percentage",
+        showUsage: cfg.showUsage,
+        usage: { usedSource: "context_window.current_usage", totalSource: "context_window.context_window_size" },
+      }, "ctx"),
+
+      "5h": () => withRow({
+        id: "5h", type: "bar", show: state.show["5h"], label: "5h ",
+        source: "rate_limits.five_hour.used_percentage",
+        presenceSource: "rate_limits.five_hour",
+        showResetIn: cfg.reset5h,
+        resetSource: "rate_limits.five_hour.resets_at",
+        showDepletion: cfg.eta5h,
+      }, "5h"),
+
+      "7d": () => withRow({
+        id: "7d", type: "bar", show: state.show["7d"], label: "7d ",
+        source: "rate_limits.seven_day.used_percentage",
+        presenceSource: "rate_limits.seven_day",
+        showResetIn: cfg.reset7d,
+        resetSource: "rate_limits.seven_day.resets_at",
+        showDepletion: cfg.eta7d,
+      }, "7d"),
+
+      stats: () => withRow({
+        id: "stats", type: "stats", show: state.show.stats, separator: " · ",
+        parts: ordered(STATS_PARTS, state.statsOrder).filter(p => state.stats[p.key].on).map(p => {
+          const icon = state.stats[p.key].icon;
+          return icon ? { key: p.key, icon } : { key: p.key };
+        }),
+      }, "stats"),
+    };
+
+    return state.order.map(id => build[id]());
+  }
+
+  function fullConfig() {
+    const cfg = readConfig();
+    const { showUsage, reset5h, eta5h, reset7d, eta7d, ...rest } = cfg;
+    return { json: { ...rest, segments: segmentsJson(cfg) }, cfg };
+  }
+
+  // --- rendering the preview ----------------------------------------------
+
+  const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  function renderHeader(cfg, opts) {
+    const out = [];
+    for (const part of ordered(HEADER_PARTS, state.headerOrder)) {
+      const s = state.header[part.key];
+      if (!s.on) continue;
+      if (part.key === "worktree" && !opts.worktree) continue;
+
+      let text;
+      if (part.key === "model") {
+        text = `[${esc(DEMO.model)}${s.effort ? `(${DEMO.effort})` : ""}]`;
+      } else {
+        let value = part.key === "dir" ? DEMO.dir
+          : part.key === "branch" ? DEMO.branch + (s.aheadBehind && DEMO.ahead ? ` ↑${DEMO.ahead}` : "")
+          : DEMO.worktree;
+        value = esc(value);
+        if (s.link) value = `<a href="#" onclick="return false">${value}</a>`;
+        text = (s.icon ? `${esc(s.icon)} ` : "") + value;
+      }
+      out.push(out.length === 0 ? text : (part.key === "dir" ? " " : " | ") + text);
+    }
+    return out.join("");
+  }
+
+  function renderBar(id, pct, cfg, opts) {
+    const stale = opts.stale && id !== "ctx";
+    const label = { ctx: "ctx", "5h": "5h ", "7d": "7d " }[id];
+    const gap = stale ? esc(cfg.bar.staleMarker) : " ";
+
+    const shape = esc(bar(pct, cfg.bar.width, cfg.bar.filledChar, cfg.bar.emptyChar));
+    const painted = cfg.colorsEnabled
+      ? `<span class="${CLASS[colorName(pct, cfg.thresholds, cfg.colors)]}">${shape}</span>`
+      : shape;
+
+    let usage = "";
+    if (id === "ctx" && cfg.showUsage) {
+      const used = Math.round((pct / 100) * DEMO.contextSize);
+      usage = ` ${formatTokens(used)}/${formatTokens(DEMO.contextSize)}`;
+    }
+
+    const notes = [];
+    const wantsReset = id === "5h" ? cfg.reset5h : id === "7d" ? cfg.reset7d : false;
+    const wantsEta = id === "5h" ? cfg.eta5h : id === "7d" ? cfg.eta7d : false;
+    if (wantsReset) notes.push(`${formatDurationMs((id === "5h" ? DEMO.reset5h : DEMO.reset7d) * 1000)} until reset`);
+    // A remembered value never gets the ETA: that usage predates the session, so there is
+    // no honest rate to derive it from until fresh samples arrive.
+    if (wantsEta && !stale) {
+      const eta = depletionEta(pct, DEMO.durationMs);
+      if (eta) notes.push(`~${eta} to limit`);
+    }
+
+    const suffix = notes.length ? ` (${esc(notes.join(", "))})` : "";
+    return `${label}${gap}${painted} ${clampPct(pct)}%${usage}${suffix}`;
+  }
+
+  function renderStats(cfg, pcts) {
+    const used = Math.round((pcts.ctx / 100) * DEMO.contextSize);
+    const burn = (used + DEMO.outputTokens) / (DEMO.durationMs / 60000);
+    const values = {
+      cost: `$${DEMO.costUsd.toFixed(2)}`,
+      duration: formatDurationMs(DEMO.durationMs),
+      burn: `${formatTokens(Math.round(burn))}/min`,
+      lines: cfg.colorsEnabled
+        ? `<span class="g">+${DEMO.linesAdded}</span> <span class="r">-${DEMO.linesRemoved}</span>`
+        : `+${DEMO.linesAdded} -${DEMO.linesRemoved}`,
+      apiTime: `api ${Math.round((DEMO.apiMs / DEMO.durationMs) * 100)}%`,
+    };
+
+    return ordered(STATS_PARTS, state.statsOrder)
+      .filter(p => state.stats[p.key].on)
+      .map(p => (state.stats[p.key].icon ? `${esc(state.stats[p.key].icon)} ` : "") + values[p.key])
+      .join(esc(" · "));
+  }
+
+  function renderPreview(cfg) {
+    const pcts = { ctx: Number($("s-ctx").value), "5h": Number($("s-5h").value), "7d": Number($("s-7d").value) };
+    const opts = { stale: $("p-stale").checked, worktree: $("p-worktree").checked };
+
+    const rows = new Map();
+    const push = (key, text) => {
+      if (!text) return;
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key).push(text);
+    };
+
+    for (const id of state.order) {
+      if (!state.show[id]) continue;
+      const key = state.row[id] === "" ? `solo:${id}` : `row:${state.row[id]}`;
+      if (id === "header") push(key, renderHeader(cfg, opts));
+      else if (id === "stats") push(key, renderStats(cfg, pcts));
+      else push(key, renderBar(id, pcts[id], cfg, opts));
+    }
+
+    const joiner = esc(cfg.layout.joiner);
+    const lines = [...rows.values()].map(parts => parts.join(joiner));
+    $("preview").innerHTML = lines.length
+      ? lines.join("\n")
+      : '<span class="empty">Nothing shown — every segment is hidden.</span>';
+
+    const tokens = {
+      model: DEMO.model, dir: DEMO.dir, ctx: String(pcts.ctx),
+      "5h": String(pcts["5h"]), "7d": String(pcts["7d"]), cost: DEMO.costUsd.toFixed(2),
+    };
+    $("term-title").textContent = cfg.terminalTitle.enabled
+      ? cfg.terminalTitle.template.replace(/\{(\w+)\}/g, (m, k) => (k in tokens ? tokens[k] : m))
+      : "cc-limits";
+  }
+
+  function refresh() {
+    const { json, cfg } = fullConfig();
+    renderPreview(cfg);
+    $("json").textContent = JSON.stringify(json, null, 2);
+    // One line, because a multi-line paste into a terminal prompt submits at the first
+    // newline and leaves the rest as separate messages.
+    $("command").textContent = `/cc-limits:apply ${JSON.stringify(json)}`;
+    for (const key of ["ctx", "5h", "7d"]) $(`v-${key}`).textContent = `${$(`s-${key}`).value}%`;
+  }
+
+  // --- loading an existing config back into the form -----------------------
+
+  const setCheck = (id, value) => { if (typeof value === "boolean") $(id).checked = value; };
+  const setNum = (id, value) => { if (Number.isFinite(value)) $(id).value = String(value); };
+  const setText = (id, value) => { if (typeof value === "string" && value !== "") $(id).value = value; };
+
+  /** Reorder `keys` to match the order they appear in `parts`, unlisted ones last. */
+  function orderFromParts(parts, keys) {
+    const seen = parts.map(p => p && p.key).filter(key => keys.includes(key));
+    return [...new Set([...seen, ...keys])];
+  }
+
+  function applyConfig(json) {
+    if (!json || typeof json !== "object") throw new Error("that isn't a config object");
+
+    setCheck("colors-on", json.colorsEnabled);
+    setNum("th-yellow", json.thresholds?.yellow);
+    setNum("th-red", json.thresholds?.red);
+    for (const [id, name] of [["col-low", json.colors?.low], ["col-med", json.colors?.medium], ["col-high", json.colors?.high]]) {
+      if (PALETTE.includes(name)) $(id).value = name;
+    }
+
+    setNum("bar-width", json.bar?.width);
+    setText("bar-filled", json.bar?.filledChar);
+    setText("bar-empty", json.bar?.emptyChar);
+    setText("bar-stale", json.bar?.staleMarker);
+    if (typeof json.layout?.joiner === "string") $("joiner").value = json.layout.joiner;
+
+    setCheck("state-on", json.state?.enabled);
+    setNum("state-age", json.state?.maxAgeMinutes);
+    setCheck("title-on", json.terminalTitle?.enabled);
+    setText("title-tpl", json.terminalTitle?.template);
+
+    if (Array.isArray(json.segments)) {
+      const known = new Set(state.order);
+      const listed = json.segments.map(s => s && s.id).filter(id => known.has(id));
+      state.order = [...new Set([...listed, ...state.order])];
+
+      // A segment the file leaves out is hidden — that is exactly what the statusline
+      // does with it, so the preview has to agree.
+      for (const id of state.order) state.show[id] = false;
+
+      for (const seg of json.segments) {
+        if (!seg || !known.has(seg.id)) continue;
+        state.show[seg.id] = seg.show !== false;
+        state.row[seg.id] = Number.isFinite(seg.row) ? String(seg.row) : "";
+
+        if (seg.id === "ctx") setCheck("ctx-usage", seg.showUsage);
+        if (seg.id === "5h") { setCheck("h5-reset", seg.showResetIn); setCheck("h5-eta", seg.showDepletion); }
+        if (seg.id === "7d") { setCheck("d7-reset", seg.showResetIn); setCheck("d7-eta", seg.showDepletion); }
+
+        if (seg.id === "header" && Array.isArray(seg.parts)) {
+          state.headerOrder = orderFromParts(seg.parts, state.headerOrder);
+          for (const key of state.headerOrder) state.header[key].on = false;
+          for (const part of seg.parts) {
+            const store = part && state.header[part.key];
+            if (!store) continue;
+            store.on = true;
+            if (typeof part.icon === "string" && "icon" in store) store.icon = part.icon;
+            for (const flag of ["effort", "link", "aheadBehind"]) {
+              if (flag in store && typeof part[flag] === "boolean") store[flag] = part[flag];
+            }
+          }
+        }
+
+        if (seg.id === "stats" && Array.isArray(seg.parts)) {
+          state.statsOrder = orderFromParts(seg.parts, state.statsOrder);
+          for (const key of state.statsOrder) state.stats[key].on = false;
+          for (const part of seg.parts) {
+            const store = part && state.stats[part.key];
+            if (!store) continue;
+            store.on = true;
+            store.icon = typeof part.icon === "string" ? part.icon : "";
+          }
+        }
+      }
+    }
+
+    buildSegments();
+    rebuildPartControls();
+    refresh();
+  }
+
+  // --- building the controls ----------------------------------------------
+
+  function buildSegments() {
+    const host = $("segments");
+    host.textContent = "";
+
+    state.order.forEach((id, index) => {
+      const meta = SEGMENT_META[id];
+      const row = el("div", { className: "seg" });
+      row.dataset.off = String(!state.show[id]);
+
+      const toggle = el("input", { type: "checkbox", checked: state.show[id] });
+      toggle.setAttribute("aria-label", `Show ${meta.name}`);
+      toggle.addEventListener("change", () => { state.show[id] = toggle.checked; buildSegments(); refresh(); });
+
+      const name = el("div", {}, [
+        el("span", { className: "name", textContent: meta.name }),
+        el("span", { className: "what", textContent: meta.what }),
+      ]);
+
+      const line = el("select");
+      line.setAttribute("aria-label", `Line for ${meta.name}`);
+      line.append(el("option", { value: "", textContent: "Own line" }));
+      for (const n of [1, 2, 3]) line.append(el("option", { value: String(n), textContent: `Line ${n}` }));
+      line.value = state.row[id];
+      line.style.width = "110px";
+      line.addEventListener("change", () => { state.row[id] = line.value; refresh(); });
+
+      const up = el("button", { className: "tiny", textContent: "↑", disabled: index === 0, title: "Move up" });
+      const down = el("button", { className: "tiny", textContent: "↓", disabled: index === state.order.length - 1, title: "Move down" });
+      const move = delta => {
+        const next = index + delta;
+        [state.order[index], state.order[next]] = [state.order[next], state.order[index]];
+        buildSegments();
+        refresh();
+      };
+      up.addEventListener("click", () => move(-1));
+      down.addEventListener("click", () => move(1));
+
+      row.append(toggle, name, line, el("div", { className: "move" }, [up, down]));
+      host.append(row);
+    });
+  }
+
+  function buildPartControls(host, parts, store, iconLabel) {
+    for (const part of parts) {
+      const s = store[part.key];
+      const block = el("div", { className: "seg", style: "grid-template-columns: minmax(0, 1fr); gap: 8px;" });
+
+      const head = el("div", { style: "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;" });
+      const toggle = el("input", { type: "checkbox", checked: s.on });
+      const title = el("label", { className: "check" }, [toggle, el("span", { className: "name", textContent: part.name })]);
+      toggle.addEventListener("change", () => { s.on = toggle.checked; refresh(); });
+      head.append(title);
+
+      if (part.icon !== null && "icon" in s) {
+        const icon = el("input", { type: "text", className: "mono", value: s.icon, maxLength: 4, style: "width: 64px;" });
+        icon.setAttribute("aria-label", `${iconLabel} for ${part.name}`);
+        icon.addEventListener("input", () => { s.icon = icon.value; refresh(); });
+        head.append(icon);
+      }
+      if (part.sample) head.append(el("span", { className: "what", textContent: part.sample }));
+      block.append(head);
+
+      for (const [flag, label, desc] of part.opts || []) {
+        const box = el("input", { type: "checkbox", checked: s[flag] });
+        box.addEventListener("change", () => { s[flag] = box.checked; refresh(); });
+        block.append(el("label", { className: "check", style: "padding-left: 24px;" }, [
+          box,
+          el("span", {}, desc ? [label, el("span", { className: "desc", textContent: desc })] : [label]),
+        ]));
+      }
+      host.append(block);
+    }
+  }
+
+  function rebuildPartControls() {
+    for (const [host, parts, store, order] of [
+      [$("header-parts"), HEADER_PARTS, state.header, state.headerOrder],
+      [$("stats-parts"), STATS_PARTS, state.stats, state.statsOrder],
+    ]) {
+      host.textContent = "";
+      buildPartControls(host, ordered(parts, order), store, "Icon");
+    }
+  }
+
+  function buildPalettes() {
+    for (const [id, initial] of [["col-low", "green"], ["col-med", "yellow"], ["col-high", "red"]]) {
+      const select = $(id);
+      for (const name of PALETTE) select.append(el("option", { value: name, textContent: name }));
+      select.value = initial;
+    }
+  }
+
+  // --- wiring --------------------------------------------------------------
+
+  buildPalettes();
+  buildSegments();
+  rebuildPartControls();
+
+  for (const node of document.querySelectorAll("input, select")) {
+    node.addEventListener("input", refresh);
+    node.addEventListener("change", refresh);
+  }
+
+  for (const button of document.querySelectorAll("button[data-bar]")) {
+    button.addEventListener("click", () => {
+      const [filled, empty] = button.dataset.bar.split("|");
+      $("bar-filled").value = filled;
+      $("bar-empty").value = empty;
+      refresh();
+    });
+  }
+
+  async function copyFrom(sourceId, okLabel) {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText($(sourceId).textContent);
+      ok = true;
+    } catch {
+      // Clipboard permission isn't granted everywhere; fall back to a selection the
+      // reader can copy with the keyboard.
+      const range = document.createRange();
+      range.selectNodeContents($(sourceId));
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      try { ok = document.execCommand("copy"); } catch { ok = false; }
+    }
+    const flag = $("copied");
+    flag.textContent = ok ? okLabel : "Select it and copy";
+    flag.className = ok ? "copied" : "copied bad";
+    flag.hidden = false;
+    setTimeout(() => { flag.hidden = true; }, 2600);
+  }
+
+  $("send").addEventListener("click", () => copyFrom("command", "Copied — paste it into Claude Code"));
+  $("copy").addEventListener("click", () => copyFrom("json", "Copied"));
+
+  $("load").addEventListener("click", () => {
+    const status = $("load-status");
+    const raw = $("load-input").value.trim();
+    if (!raw) {
+      status.textContent = "Paste a config first.";
+      status.className = "note bad";
+      return;
+    }
+    try {
+      // Tolerate a pasted command line as readily as bare JSON — people copy back
+      // whatever they have to hand.
+      applyConfig(JSON.parse(raw.replace(/^\/\S*apply\s+/, "")));
+      status.textContent = "Loaded — the controls now match your config.";
+      status.className = "note ok";
+    } catch (error) {
+      status.textContent = `Couldn't read that: ${error.message}`;
+      status.className = "note bad";
+    }
+  });
+
+  refresh();
+})();
+</script>
+<!-- artifact:end -->
+</body>
+</html>

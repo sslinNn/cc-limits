@@ -16,7 +16,7 @@
   <img src="assets/demo.gif" alt="A session fast-forwarded: the context and 5-hour bars fill up, cross the 70% and 90% thresholds, and the time-to-limit estimate drops below the countdown to reset." width="920">
 </p>
 
-Two lines, because a statusline you glance at shouldn't cost a third of a short terminal. Green under 70%, yellow from 70, red from 90 — per bar, so the one that's actually in trouble is the one that changes color. Want it spread out over five lines, or squeezed onto one? One button either way.
+Two lines, because a statusline you glance at shouldn't cost a third of a short terminal. Green under 70%, yellow from 70, red from 90 — per bar, so the one that's actually in trouble is the one that changes color. Want it spread out over five lines, or squeezed onto one? [One button either way](#make-it-yours) — every option is a page you click through with a live preview, and you never open a config file.
 
 ---
 
@@ -157,7 +157,15 @@ Two ways to the same result. No file editing either way.
 
 **Answer a few questions:** run `/cc-limits:setup` and Claude writes the config for you.
 
-**Or see every option at once:** run `/cc-limits:configure` — it opens [`plugin/configurator.html`](plugin/configurator.html) in your browser with your current config already loaded. One self-contained page, no server, no install, no network. Every setting laid out with a live preview of your statusline, plus sliders that show exactly where your color thresholds kick in, and a **Reset to defaults** button when you've gone too far. Hit **Copy command**, paste into Claude Code:
+**Or see every option at once:** run `/cc-limits:configure`.
+
+<p align="center">
+  <img src="assets/configurator.gif" alt="The configurator: clicking the Minimal, Full and Compact layout presets rebuilds the statusline preview on the spot, then Copy command produces the line to paste back." width="920">
+</p>
+
+It opens [`plugin/configurator.html`](plugin/configurator.html) in your browser with your current config already loaded, and every control starts on what your statusline is doing right now. The preview at the top right is the real renderer, not a mockup — it redraws on every click, so you pick a layout by looking at it rather than by reading what `"row": 2` means. Sliders show exactly where your color thresholds land, and **Reset to defaults** undoes an afternoon of tweaking. One self-contained page: no server, no install, no network.
+
+Hit **Copy command**, paste into Claude Code:
 
 ```
 /cc-limits:apply {"colorsEnabled":true,...}

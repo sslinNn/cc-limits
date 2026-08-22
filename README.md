@@ -12,10 +12,9 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
 </p>
 
-```
-[Opus 5(H)] 📁 my-project | 🌿 main ↑2 │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
-ctx ▓▓▓░░░░░ 32% 64K │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
-```
+<p align="center">
+  <img src="assets/demo.gif" alt="A session fast-forwarded: the context and 5-hour bars fill up, cross the 70% and 90% thresholds, and the time-to-limit estimate drops below the countdown to reset." width="920">
+</p>
 
 Two lines, because a statusline you glance at shouldn't cost a third of a short terminal. Green under 70%, yellow from 70, red from 90 — per bar, so the one that's actually in trouble is the one that changes color. Want it spread out over five lines, or squeezed onto one? One button either way.
 
@@ -63,6 +62,94 @@ Claude Code only puts `rate_limits` in the payload after a session's first API r
 ```
 
 A remembered value is dropped the moment its window resets (the number would be a lie) or once it's more than 12 hours old. Remembered values never show an ETA — that usage predates the session, so estimating from the session's runtime would invent a burn rate out of nothing.
+
+## Usage examples
+
+### Read the line
+
+Nothing to run — it's there from the first render of a new session.
+
+```
+[Opus 5(H)] 📁 my-project | 🌿 main ↑2 │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
+ctx ▓▓▓░░░░░ 32% 64K │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
+```
+
+The two notes on `5h` are the whole point: `↻2h1m` is when the window resets, `~4h33m` is when you'd hit the limit at your current pace. As long as the reset lands sooner than the ETA, you're fine. When the ETA drops under the countdown — `↻3h20m ~40m` — you have 40 minutes at this pace before you're stuck for three, and that's the moment to leave the big refactor for tomorrow.
+
+### Change one thing, conversationally
+
+```
+/cc-limits:setup
+```
+
+Claude reads your current config, asks a handful of questions, and writes the file. Answers can be as loose as *"drop the weekly bar and make the context one red at 80"* — it maps them onto the schema and tells you what changed. Takes effect on the next render, no restart.
+
+### Change everything at once, visually
+
+```
+/cc-limits:configure
+```
+
+Opens the configurator in your browser with your live config already loaded — every option with a preview of your actual statusline. Tweak, hit **Copy command**, paste the result back:
+
+```
+/cc-limits:apply {"colorsEnabled":true,"thresholds":{"yellow":70,"red":90},…}
+```
+
+`/cc-limits:apply` validates it, says in plain language what's about to change, and writes it.
+
+### Squeeze it onto one line
+
+For a short terminal, or a split pane. Click **Minimal** in the configurator, or ask `/cc-limits:setup` for "one line, no bars, just the numbers":
+
+```
+[Opus 5(H)] 📁 my-project | 🌿 main │ ctx 32% │ 5h 18% ↻2h1m │ 7d 41% │ $1.23
+```
+
+Every bar goes to `"row": 1` with `"showBar": false` — the percentage inherits the color the bar was carrying, so you still get the green→yellow→red warning in a quarter of the width.
+
+### Hide a segment you don't need
+
+On a plan without weekly limits, or when the cost readout is a distraction:
+
+```json
+{ "id": "7d", "type": "bar", "show": false, … }
+```
+
+Use `"show": false` rather than deleting the entry — `segments` is the complete list of what renders, so a segment you remove is one `/cc-limits:setup` has to put back later.
+
+### Plain-ASCII terminal
+
+Some terminals and multiplexers render `▓░↻` as boxes. Swap the characters out:
+
+```json
+"bar": { "width": 8, "filledChar": "#", "emptyChar": "-", "staleMarker": "~" },
+"layout": { "noteMarkers": { "reset": "r", "limit": "~" } }
+```
+
+```
+ctx ###----- 32% 64K │ 5h #------- 18% r2h1m ~4h33m │ 7d ###----- 41% r6d3h
+```
+
+### Watch it from a background tab
+
+The statusline is invisible when Claude Code isn't the focused tab, so mirror the numbers into the terminal title:
+
+```json
+"terminalTitle": { "enabled": true, "template": "ctx {ctx}% · 5h {5h}% · {dir}" }
+```
+
+The tab now reads `ctx 32% · 5h 18% · my-project` while you're somewhere else.
+
+### Get warned earlier on the weekly window
+
+The weekly window is the one you can't wait out, so give it its own thresholds while everything else stays at 70/90:
+
+```json
+{ "id": "7d", "type": "bar", "show": true, "thresholds": { "yellow": 40, "red": 60 }, … }
+```
+
+Now `7d` turns yellow at 40% and red at 60% — early enough to pace the rest of the week — and the other bars are unaffected.
 
 ## Make it yours
 

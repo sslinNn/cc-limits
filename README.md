@@ -39,6 +39,8 @@ Already using a different statusline? cc-limits leaves it alone and hands you a 
 
 **Needs:** Node on your PATH, and a Claude.ai Pro/Max subscription for the `5h`/`7d` bars — Claude Code only sends `rate_limits` to subscribers, after a session's first API response. The `ctx` and `stats` segments work for everyone.
 
+> ⚠️ Anthropic doesn't control what a plugin ships and can't verify that it works as intended or that it won't change — so make sure you trust one before installing or updating it. cc-limits is a single Node script with no dependencies, no network access and no telemetry: [read it before you run it](plugin/scripts/statusline.js).
+
 ## What you get
 
 | Segment | Renders |

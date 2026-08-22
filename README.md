@@ -1,34 +1,34 @@
-# cc-limits
+<h1 align="center">cc-limits</h1>
 
-[![Listed on ClaudePluginHub](https://www.claudepluginhub.com/badge/sslinnn-cc-limits-plugin)](https://www.claudepluginhub.com/plugins/sslinnn-cc-limits-plugin?ref=badge)
+<p align="center">
+  <b>Know how much Claude you have left — before Claude tells you.</b><br>
+  A Claude Code statusline that puts your 5-hour and weekly rate limits, your context window,<br>
+  and what this session is costing you on one line you never have to think about.
+</p>
 
-A Claude Code statusline plugin that shows, in realtime:
-
-- **context** — how much of the current session's context window is used, in percent and tokens
-- **5h** — Claude.ai Pro/Max 5-hour rate-limit usage, with time until reset and an estimate of when you'll hit it
-- **7d** — Claude.ai Pro/Max weekly rate-limit usage
-- **stats** — session cost, duration, token burn rate, lines changed
-
-All data comes from Claude Code's built-in [statusline JSON](https://code.claude.com/docs/en/statusline) — no polling, no external API calls, no daemon. The only thing kept on disk is a small local record of the rate-limit windows themselves (see [Remembered limits](#remembered-limits)).
+<p align="center">
+  <a href="https://www.claudepluginhub.com/plugins/sslinnn-cc-limits-plugin?ref=badge"><img src="https://www.claudepluginhub.com/badge/sslinnn-cc-limits-plugin" alt="Listed on ClaudePluginHub"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="Zero dependencies">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
+</p>
 
 ```
 [Opus 5(H)] 📁 my-project | 🌿 main ↑2
-
 ctx ▓▓▓░░░░░░░ 32% 64K/200K
-
 5h  ▓▓░░░░░░░░ 18% (2h1m until reset, ~4h33m to limit)
-
 7d  ▓▓▓▓░░░░░░ 41% (6d3h until reset)
-
 $1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
 ```
 
-Colors: green (<70%), yellow (70-89%), red (≥90%) per bar.
+Green under 70%, yellow from 70, red from 90 — per bar, so the one that's actually in trouble is the one that changes color.
 
-## Requirements
+---
 
-- Node.js on PATH
-- `rate_limits` (5h/7d) only appears for Claude.ai Pro/Max subscribers, after the first API response in a session
+## Why
+
+Claude Code tells you that you've hit your limit. It doesn't tell you that you're *about* to.
+
+cc-limits turns both rate-limit windows into something you can plan around: how full they are, when they reset, and — measured from how fast the window is actually filling — roughly **when you'll run out**. Same for the context window, so a compaction never lands as a surprise mid-refactor.
 
 ## Install
 
@@ -37,99 +37,113 @@ Colors: green (<70%), yellow (70-89%), red (≥90%) per bar.
 /plugin install cc-limits@cc-limits
 ```
 
-Start a new session (or restart Claude Code). The plugin's `SessionStart` hook copies its script to `~/.claude/cc-limits-statusline.js` and configures `~/.claude/settings.json` for you automatically — no manual editing required.
+Start a new session. That's it — the `SessionStart` hook copies the script to `~/.claude/cc-limits-statusline.js` and wires up `~/.claude/settings.json` for you. Nothing to edit by hand.
 
-If you already have a different `statusLine` configured, cc-limits leaves it untouched and just lets you know (with a ready-to-paste snippet) in case you want to switch to it yourself.
+Already using a different statusline? cc-limits leaves it alone and hands you a ready-to-paste snippet in case you want to switch.
 
-## What each segment shows
+**Needs:** Node on your PATH, and a Claude.ai Pro/Max subscription for the `5h`/`7d` bars — Claude Code only sends `rate_limits` to subscribers, after a session's first API response. The `ctx` and `stats` segments work for everyone.
+
+## What you get
 
 | Segment | Renders |
 |---|---|
-| `header` | Model (with effort tier and fast-mode `↯`), directory, git branch with `↑ahead ↓behind`, `🌳 worktree` name during a `--worktree` session |
+| `header` | Model with effort tier and fast-mode `↯`, directory, git branch with `↑ahead ↓behind`, and the `🌳 worktree` name during a `--worktree` session |
 | `ctx` | Context bar, percentage, and `used/total` tokens |
-| `5h` | 5-hour limit bar, time until reset, and `~ETA to limit` at the current session's pace |
-| `7d` | Weekly limit bar; reset countdown reads in days (`6d3h`) |
-| `stats` | `$cost · ⏱ duration · 🔥 tokens/min · +added -removed` (an `apiTime` part showing API time as a share of session time is available too) |
+| `5h` | 5-hour limit bar, countdown to reset, and `~ETA to limit` at your current pace |
+| `7d` | Weekly limit bar; its countdown reads in days (`6d3h`) |
+| `stats` | `$cost · ⏱ duration · 🔥 tokens/min · +added -removed`, plus an optional `api %` share |
 
-The `~ETA to limit` estimate is measured from how fast the window has actually been filling (see below), which counts usage from your other sessions too. Until there's enough history to measure — the first couple of minutes — it falls back to assuming the whole window's usage came from this session, which reads pessimistically. It hides itself when the pace is too slow to matter or the estimate lands past a day.
+### The ETA is measured, not guessed
 
-## Remembered limits
+`~4h33m to limit` comes from the slope of the window itself — sampled over the session, so it counts usage from your **other** sessions too, not just this one. Before there's enough history to measure (the first couple of minutes) it falls back to assuming the whole window came from this session, which reads pessimistically. It hides itself when the pace is too slow to matter or the answer lands past a day, because an estimate nobody can act on is just noise.
 
-Claude Code only puts `rate_limits` in the payload after a session's first API response, so at the start of every session the 5h/7d bars had nothing to draw. cc-limits now keeps the last values it saw in `~/.claude/cc-limits-state.json` and draws them with a `~` marker until the live numbers arrive:
+### Your limits are there from the first render
+
+Claude Code only puts `rate_limits` in the payload after a session's first API response — so historically the 5h/7d bars had nothing to draw exactly when you needed them most: at the start, deciding whether to begin the big task. cc-limits remembers the last values it saw and draws them with a `~` marker until the live numbers land:
 
 ```
 5h ~▓▓░░░░░░░░ 18% (2h0m until reset)
 ```
 
-A remembered value is dropped once its window has reset (the number would be a lie) or once it's older than 12 hours. Remembered values never get an ETA — that usage predates the session, so estimating from the session's runtime would invent a burn rate.
+A remembered value is dropped the moment its window resets (the number would be a lie) or once it's more than 12 hours old. Remembered values never show an ETA — that usage predates the session, so estimating from the session's runtime would invent a burn rate out of nothing.
 
-The same record holds a short sample history per window, which is what makes the ETA a measurement rather than a guess. Samples are taken at most every 30 seconds, capped at 60 per window, and thrown away when the window rolls over. The file is a few hundred bytes, written only when something actually changed, and rewritten atomically so parallel sessions can't tear each other's history.
+## Make it yours
 
-Turn the whole thing off with `"state": { "enabled": false }` — the bars then behave as before, hiding until Claude Code sends live limits.
+Two ways to the same result. No file editing either way.
 
-## Terminal title (opt-in)
+**Answer a few questions:** run `/cc-limits:setup` and Claude writes the config for you.
 
-The statusline is invisible when Claude Code sits in a background tab. cc-limits can put the same numbers in the terminal's title:
-
-```json
-"terminalTitle": { "enabled": true, "template": "ctx {ctx}% · 5h {5h}% · {dir}" }
-```
-
-Available placeholders: `{ctx}`, `{5h}`, `{7d}`, `{cost}`, `{dir}`, `{model}` (percentages are bare numbers, empty when unknown). The escape is written straight to `/dev/tty`, since stdout belongs to Claude Code — which also means it does nothing on Windows or without a controlling terminal. Off by default, because it writes outside our own line.
-
-The effort tier comes from `effortLevel` in `~/.claude/settings.json` (or `CLAUDE_CODE_EFFORT_LEVEL`), since Claude Code doesn't put it in the statusline payload; an unset tier renders as `H`, Claude Code's own default. It's hidden for Haiku, which has no effort tier.
-
-## Customization
-
-Two ways, same result — colors, thresholds, which segments show and in what order, icons, bar style, layout:
-
-**Answer questions:** run `/cc-limits:setup` in Claude Code and it writes the config for you.
-
-**Or see everything at once:** open [`plugin/configurator.html`](plugin/configurator.html) in a browser — a single self-contained page, no server, no install. Every option is laid out with a live preview of the statusline, including sliders that show where your color thresholds kick in. When it looks right, hit **Copy command** and paste the result into Claude Code:
+**Or see every option at once:** open [`plugin/configurator.html`](plugin/configurator.html) in a browser — one self-contained page, no server, no install, no network. Every setting laid out with a live preview of your statusline, plus sliders that show exactly where your color thresholds kick in. Hit **Copy command**, paste into Claude Code:
 
 ```
 /cc-limits:apply {"colorsEnabled":true,...}
 ```
 
-`/cc-limits:apply` checks the config, tells you what changes, and writes the file. Nothing to save by hand.
+`/cc-limits:apply` validates it, tells you in plain language what's about to change, and writes the file. Already have a config? Paste it into the page's **Start from your current config** box and every control jumps to your settings.
 
-Already have a config? Ask Claude Code to show it, paste it into the page's **Start from your current config** box, and every control jumps to your settings.
+### Compact layouts
 
-Defaults:
+Five lines is a lot of terminal. The configurator has three buttons — **Full**, **Compact**, **Minimal** — and each is just a batch of settings you can keep tweaking afterwards.
 
-| Setting | Default |
-|---|---|
-| Segments (in order) | header (model, dir, git branch, worktree), ctx, 5h, 7d, stats |
-| Colors | green (`<70%`), yellow (`70-89%`), red (`≥90%`) |
-| Bar | width 10, `▓` filled / `░` empty |
-| Reset-time-until | shown for 5h and 7d |
-| ETA to limit | shown for 5h |
-| Context tokens | shown |
-| Icons | 📁 directory, 🌿 branch, 🌳 worktree, ⏱ duration, 🔥 burn rate |
-| Layout | one line per segment |
-| Remembered limits | on, `~` marker, 12-hour max age |
-| Terminal title | off |
+**Compact — two lines:**
 
-### Compact layout
+```
+[Opus 5(H)] 📁 my-project | 🌿 main │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min
+ctx ▓▓▓░░░░░ 32% │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
+```
 
-Give segments the same `row` number and they share a line, joined by `layout.joiner` (default ` │ `):
+**Minimal — one:**
+
+```
+[Opus 5(H)] 📁 my-project | 🌿 main │ ctx 32% │ 5h 18% ↻2h1m │ 7d 41% │ $1.23
+```
+
+Three independent knobs get you there:
+
+- **Share lines.** Segments with the same `"row"` number render side by side, joined by `layout.joiner` (default ` │ `). No `row` means the segment keeps a line to itself.
+- **Shorten the notes.** `"layout": { "noteStyle": "short" }` turns `(3h53m until reset, ~3h0m to limit)` into `↻3h53m ~3h0m`, and drops the never-changing context-window size from the token count. Set it per segment to mix both styles; pick your own symbols with `"noteMarkers": { "reset": "r", "limit": "~" }` if your terminal can't draw the arrow.
+- **Drop the bar.** `"showBar": false` leaves just `5h 40%` — and the percentage takes over the color the bar was carrying.
+
+### Terminal title
+
+The statusline is invisible when Claude Code sits in a background tab. cc-limits can mirror the numbers into the terminal title instead:
 
 ```json
-{ "id": "ctx", "row": 1 }, { "id": "5h", "row": 1 }, { "id": "7d", "row": 1 }
+"terminalTitle": { "enabled": true, "template": "ctx {ctx}% · 5h {5h}% · {dir}" }
 ```
 
-```
-[Opus 5(H)] 📁 my-project | 🌿 main
-ctx ▓▓▓░░░░░░░ 32% │ 5h ▓▓░░░░░░░░ 18% │ 7d ▓▓▓▓░░░░░░ 41%
-```
-
-A segment without a `row` keeps a line to itself, which is the default.
+Placeholders: `{ctx}` `{5h}` `{7d}` `{cost}` `{dir}` `{model}` — percentages are bare numbers, empty when unknown. The escape goes straight to `/dev/tty` (stdout belongs to Claude Code), which also means it quietly does nothing on Windows or without a controlling terminal. Off by default, because it writes outside our own line.
 
 ### Clickable links
 
-`{ "key": "dir", "link": true }` makes the directory an OSC8 link to the folder, and `{ "key": "branch", "link": true }` links the branch to its remote on GitHub/GitLab. Terminals without OSC8 support just print the text. The branch link costs one extra `git remote get-url` per render, so it's off by default.
+`{ "key": "dir", "link": true }` turns the directory into an OSC8 link to the folder; `{ "key": "branch", "link": true }` links the branch to its remote on GitHub/GitLab. Terminals without OSC8 just print the text. The branch link costs one extra `git remote get-url` per render, so it's off by default.
 
-Advanced: the config lives at `~/.claude/cc-limits-config.json` as plain JSON matching the schema `/cc-limits:setup` writes, if you'd rather edit it directly. The `segments` array is the complete list of what renders — a segment you leave out is hidden, so after an update that adds a new segment, run `/cc-limits:setup` (or add it yourself) to pick it up.
+### Defaults
+
+| Setting | Default |
+|---|---|
+| Segments (in order) | header (model, dir, branch, worktree), ctx, 5h, 7d, stats |
+| Colors | green `<70%`, yellow `70–89%`, red `≥90%` |
+| Bar | width 10, `▓` filled / `░` empty |
+| Countdown to reset | 5h and 7d |
+| ETA to limit | 5h |
+| Context tokens | shown |
+| Icons | 📁 dir · 🌿 branch · 🌳 worktree · ⏱ duration · 🔥 burn rate |
+| Layout | one line per segment, full-length notes, bars shown |
+| Remembered limits | on, `~` marker, 12-hour max age |
+| Terminal title | off |
+
+Thresholds and colors are overridable per segment too — so the weekly bar can go red at 50% while everything else stays at 90%.
+
+## How it works
+
+Everything on the line comes from the JSON Claude Code already pipes into your statusline command ([docs](https://code.claude.com/docs/en/statusline)). **No polling, no API calls, no daemon, no telemetry, zero dependencies** — one Node script using nothing but the standard library.
+
+The only thing written to disk is `~/.claude/cc-limits-state.json`: the last rate-limit values plus a short sample history per window, which is what makes the ETA a measurement instead of a guess. Samples are taken at most every 30 seconds, capped at 60 per window, and thrown away when a window rolls over. The file is a few hundred bytes, written only when something actually changed, and replaced atomically so parallel sessions can't tear each other's history. Don't want it at all? `"state": { "enabled": false }` — the bars then simply stay hidden until live limits arrive.
+
+The effort tier is read from `effortLevel` in `~/.claude/settings.json` (or `CLAUDE_CODE_EFFORT_LEVEL`), since Claude Code doesn't put it in the payload; unset renders as `H`, Claude Code's own default, and it's hidden for Haiku, which has no tier.
+
+Prefer editing JSON directly? The config is plain JSON at `~/.claude/cc-limits-config.json`, matching the schema documented in [`plugin/commands/setup.md`](plugin/commands/setup.md). Note that `segments` is the **complete** list of what renders — a segment you leave out is hidden, so after an update that adds a new one, run `/cc-limits:setup` (or add it yourself) to pick it up.
 
 ## Update
 
@@ -137,7 +151,7 @@ Advanced: the config lives at `~/.claude/cc-limits-config.json` as plain JSON ma
 /plugin marketplace update cc-limits
 ```
 
-The `SessionStart` hook re-copies the script on the next session, so `~/.claude/cc-limits-statusline.js` always matches the installed plugin version.
+The `SessionStart` hook re-copies the script next session, so `~/.claude/cc-limits-statusline.js` always matches the installed version.
 
 ## License
 

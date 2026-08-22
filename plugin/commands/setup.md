@@ -16,7 +16,7 @@ Schema:
   "thresholds": { "yellow": 70, "red": 90 },
   "colors": { "low": "green", "medium": "yellow", "high": "red" },
   "bar": { "width": 10, "filledChar": "▓", "emptyChar": "░", "staleMarker": "~" },
-  "layout": { "joiner": " │ " },
+  "layout": { "joiner": " │ ", "noteStyle": "full", "noteMarkers": { "reset": "↻", "limit": "~" } },
   "git": { "timeoutMs": 250 },
   "state": { "enabled": true, "minSampleSeconds": 30, "maxHistory": 60, "maxAgeMinutes": 720 },
   "terminalTitle": { "enabled": false, "template": "ctx {ctx}% · 5h {5h}% · {dir}" },
@@ -30,18 +30,18 @@ Schema:
       ] },
     { "id": "ctx", "type": "bar", "show": true, "label": "ctx",
       "source": "context_window.used_percentage",
-      "showUsage": true,
+      "showBar": true, "showUsage": true,
       "usage": { "usedSource": "context_window.current_usage",
                  "totalSource": "context_window.context_window_size" } },
     { "id": "5h", "type": "bar", "show": true, "label": "5h ",
       "source": "rate_limits.five_hour.used_percentage",
       "presenceSource": "rate_limits.five_hour",
-      "showResetIn": true, "resetSource": "rate_limits.five_hour.resets_at",
+      "showBar": true, "showResetIn": true, "resetSource": "rate_limits.five_hour.resets_at",
       "showDepletion": true },
     { "id": "7d", "type": "bar", "show": true, "label": "7d ",
       "source": "rate_limits.seven_day.used_percentage",
       "presenceSource": "rate_limits.seven_day",
-      "showResetIn": false, "resetSource": "rate_limits.seven_day.resets_at",
+      "showBar": true, "showResetIn": false, "resetSource": "rate_limits.seven_day.resets_at",
       "showDepletion": false },
     { "id": "stats", "type": "stats", "show": true, "separator": " · ",
       "parts": [
@@ -65,10 +65,29 @@ Notes on the schema:
   - `worktree` only renders during a `--worktree` session.
 - `stats.parts` accepts `cost`, `duration`, `burn` (tokens/min), `lines` (`+added -removed`), and `apiTime` (API time as a share of session time). Each part renders only when its data is present, and the whole segment disappears when none is.
 - Bar segments accept `"showUsage": true` (token counts next to the percentage — only meaningful for `ctx`, whose `usage` block points at the token fields) and `"showDepletion": true` (an `~ETA to limit` estimate at the session's current pace — only meaningful for rate-limit bars).
-- Any segment accepts `"row": <number>`. Segments sharing a row render on one line joined by `layout.joiner`; a segment without a row keeps a line to itself. This is how a compact one-line layout is built.
+- Bar segments also accept `"showBar": false`, which drops the bar graphic and leaves `5h 40%` — the percentage then takes the color the bar was carrying. Their `label` is padded (`"5h "`, `"7d "`) so stacked bars line up under `ctx`; drop the padding when they share a line, where it is just a stray space.
+- Any segment accepts `"row": <number>`. Segments sharing a row render on one line joined by `layout.joiner`; a segment without a row keeps a line to itself.
+- `layout.noteStyle` is `"full"` (default) or `"short"`. Short renders the notes as `↻3h53m ~3h0m` instead of `(3h53m until reset, ~3h0m to limit)`, and drops the fixed window size from `ctx`'s token count (`64K` rather than `64K/200K`). A segment may carry its own `noteStyle` to override the global one. `layout.noteMarkers` sets the two symbols, for terminals that can't draw the arrow.
 - `git.timeoutMs` caps how long each git call may take before the branch info is silently dropped.
 - `state` controls the remembered rate-limit windows kept in `~/.claude/cc-limits-state.json`. They let the 5h/7d bars show their last known value (prefixed with `bar.staleMarker`) before Claude Code sends live limits in a new session, and they hold the sample history that makes the `~ETA to limit` a measurement instead of a guess. `maxAgeMinutes` is how long a remembered value stays trustworthy; `minSampleSeconds` and `maxHistory` control sampling. `"enabled": false` disables the file entirely — bars then hide until live limits arrive, as they did before.
 - `terminalTitle` optionally writes the same numbers to the terminal's title (useful when Claude Code is in a background tab). Placeholders: `{ctx}`, `{5h}`, `{7d}`, `{cost}`, `{dir}`, `{model}`. It writes to `/dev/tty`, so it silently does nothing on Windows or without a controlling terminal. Off by default — only enable it if the user asks.
+
+## Compact layouts
+
+`row`, `noteStyle` and `showBar` together are how the five-line default shrinks — `row` alone only moves lines around. When the user says the statusline takes too much room, offer one of these as a starting point, then let them tweak:
+
+- **Compact (2 lines):** `header` and `stats` on `"row": 1`; `ctx`/`5h`/`7d` on `"row": 2` with unpadded labels (`"5h"`, `"7d"`); `layout.noteStyle: "short"`; `bar.width: 8`; `ctx` `"showUsage": false`.
+
+  ```
+  [Opus 5(H)] 📁 my-project | 🌿 main │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min
+  ctx ▓▓▓░░░░░ 32% │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
+  ```
+
+- **Minimal (1 line):** every segment on `"row": 1`; `"showBar": false` on all three bars; `noteStyle: "short"`; only the 5h reset note kept; `stats` trimmed to `cost`.
+
+  ```
+  [Opus 5(H)] 📁 my-project | 🌿 main │ ctx 32% │ 5h 18% ↻2h1m │ 7d 41% │ $1.23
+  ```
 
 ## Flow
 
@@ -78,7 +97,7 @@ Notes on the schema:
 
 2. **Ask in small groups, not one long form.** Suggested groups — ask conversationally, offer the current/default value as the easy "keep it" answer, and let the user skip anything they don't care about:
    - Segments & order: which of header, context, 5-hour limit, 7-day limit, stats do they want shown, and in what order?
-   - Layout: one line per segment (default), or should some share a line? If they want compact, put the bar segments on the same `row`.
+   - Layout: one line per segment (default), or should some share a line? If they say it takes too much space, offer the compact or minimal layout above rather than only moving rows around — `row` alone doesn't shorten anything.
    - Header details: which of model/dir/branch/worktree to include, keep the icons, and do they want the effort badge, `↑↓` ahead/behind, and clickable links?
    - Stats details: which of cost/duration/burn rate/lines changed/API time.
    - Colors: keep color on? If so, keep green/yellow/red or use different colors from the supported palette?

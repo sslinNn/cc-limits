@@ -299,10 +299,16 @@
     <div class="main">
 
       <section class="card">
-        <h2>Segments <span class="hint">order top to bottom · a segment can share a line with the one above</span></h2>
+        <h2>Segments <span class="hint">order top to bottom · segments sharing a line render side by side</span></h2>
         <div class="body">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+            <span class="lbl" style="margin-right: 2px;">Layout</span>
+            <button class="tiny" data-preset="full">Full · 5 lines</button>
+            <button class="tiny" data-preset="compact">Compact · 2 lines</button>
+            <button class="tiny" data-preset="minimal">Minimal · 1 line</button>
+          </div>
           <div id="segments" class="body" style="padding: 0; gap: 8px;"></div>
-          <p class="note">A hidden segment is written as <code>"show": false</code> rather than dropped, so it keeps its settings for later.</p>
+          <p class="note">A preset just sets the controls below — tweak anything afterwards. A hidden segment is written as <code>"show": false</code> rather than dropped, so it keeps its settings for later.</p>
         </div>
       </section>
 
@@ -315,12 +321,20 @@
         <h2>Bars</h2>
         <div class="body">
           <div class="grid2">
+            <label class="check"><input type="checkbox" id="note-short"><span>Short reset/ETA notes<span class="desc">↻3h53m ~1h2m instead of (3h53m until reset, ~1h2m to limit)</span></span></label>
             <label class="check"><input type="checkbox" id="ctx-usage" checked><span>Token counts on the context bar<span class="desc">64K/200K</span></span></label>
             <label class="check"><input type="checkbox" id="h5-reset" checked><span>5h: time until reset<span class="desc">(2h1m until reset)</span></span></label>
             <label class="check"><input type="checkbox" id="h5-eta" checked><span>5h: estimated time to limit<span class="desc">measured from how fast the window fills</span></span></label>
             <label class="check"><input type="checkbox" id="d7-reset" checked><span>7d: time until reset<span class="desc">(6d3h until reset)</span></span></label>
             <label class="check"><input type="checkbox" id="d7-eta"><span>7d: estimated time to limit<span class="desc">rarely useful — a week fills slowly</span></span></label>
           </div>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
+            <span class="lbl">Bar graphic on</span>
+            <label class="check"><input type="checkbox" id="bar-on-ctx" checked><span>ctx</span></label>
+            <label class="check"><input type="checkbox" id="bar-on-5h" checked><span>5h</span></label>
+            <label class="check"><input type="checkbox" id="bar-on-7d" checked><span>7d</span></label>
+          </div>
+          <p class="note">Turned off, the segment shrinks to <code>5h 40%</code> and the percentage itself takes the color the bar carried.</p>
         </div>
       </section>
 
@@ -514,6 +528,11 @@
   };
 
   const $ = id => document.getElementById(id);
+  /** True when another shown segment sits on the same line as `id`. */
+  const sharesLine = id =>
+    state.row[id] !== "" &&
+    state.order.some(other => other !== id && state.show[other] && state.row[other] === state.row[id]);
+  const BAR_LABELS = { ctx: "ctx", "5h": "5h ", "7d": "7d " };
   const ordered = (list, order) => order.map(key => list.find(p => p.key === key)).filter(Boolean);
   const el = (tag, props = {}, kids = []) => {
     const node = Object.assign(document.createElement(tag), props);
@@ -582,7 +601,7 @@
         emptyChar: $("bar-empty").value || "░",
         staleMarker: $("bar-stale").value || "~",
       },
-      layout: { joiner: $("joiner").value },
+      layout: { joiner: $("joiner").value, noteStyle: $("note-short").checked ? "short" : "full" },
       git: { timeoutMs: 250 },
       state: {
         enabled: $("state-on").checked,
@@ -592,6 +611,7 @@
       },
       terminalTitle: { enabled: $("title-on").checked, template: $("title-tpl").value },
       showUsage: $("ctx-usage").checked,
+      showBar: { ctx: $("bar-on-ctx").checked, "5h": $("bar-on-5h").checked, "7d": $("bar-on-7d").checked },
       reset5h: $("h5-reset").checked,
       eta5h: $("h5-eta").checked,
       reset7d: $("d7-reset").checked,
@@ -601,6 +621,10 @@
 
   function segmentsJson(cfg) {
     const withRow = (obj, id) => (state.row[id] === "" ? obj : { ...obj, row: Number(state.row[id]) });
+
+    // `5h `/`7d ` are padded to line up under `ctx` when the bars are stacked. Side by
+    // side that padding is just a stray space, so a shared line drops it.
+    const label = id => (sharesLine(id) ? id : BAR_LABELS[id]);
 
     const build = {
       header: () => withRow({
@@ -618,25 +642,28 @@
       }, "header"),
 
       ctx: () => withRow({
-        id: "ctx", type: "bar", show: state.show.ctx, label: "ctx",
+        id: "ctx", type: "bar", show: state.show.ctx, label: label("ctx"),
         source: "context_window.used_percentage",
+        showBar: cfg.showBar.ctx,
         showUsage: cfg.showUsage,
         usage: { usedSource: "context_window.current_usage", totalSource: "context_window.context_window_size" },
       }, "ctx"),
 
       "5h": () => withRow({
-        id: "5h", type: "bar", show: state.show["5h"], label: "5h ",
+        id: "5h", type: "bar", show: state.show["5h"], label: label("5h"),
         source: "rate_limits.five_hour.used_percentage",
         presenceSource: "rate_limits.five_hour",
+        showBar: cfg.showBar["5h"],
         showResetIn: cfg.reset5h,
         resetSource: "rate_limits.five_hour.resets_at",
         showDepletion: cfg.eta5h,
       }, "5h"),
 
       "7d": () => withRow({
-        id: "7d", type: "bar", show: state.show["7d"], label: "7d ",
+        id: "7d", type: "bar", show: state.show["7d"], label: label("7d"),
         source: "rate_limits.seven_day.used_percentage",
         presenceSource: "rate_limits.seven_day",
+        showBar: cfg.showBar["7d"],
         showResetIn: cfg.reset7d,
         resetSource: "rate_limits.seven_day.resets_at",
         showDepletion: cfg.eta7d,
@@ -656,7 +683,7 @@
 
   function fullConfig() {
     const cfg = readConfig();
-    const { showUsage, reset5h, eta5h, reset7d, eta7d, ...rest } = cfg;
+    const { showUsage, showBar, reset5h, eta5h, reset7d, eta7d, ...rest } = cfg;
     return { json: { ...rest, segments: segmentsJson(cfg) }, cfg };
   }
 
@@ -689,33 +716,43 @@
 
   function renderBar(id, pct, cfg, opts) {
     const stale = opts.stale && id !== "ctx";
-    const label = { ctx: "ctx", "5h": "5h ", "7d": "7d " }[id];
+    const label = sharesLine(id) ? id : BAR_LABELS[id];
     const gap = stale ? esc(cfg.bar.staleMarker) : " ";
+    const short = cfg.layout.noteStyle === "short";
 
-    const shape = esc(bar(pct, cfg.bar.width, cfg.bar.filledChar, cfg.bar.emptyChar));
-    const painted = cfg.colorsEnabled
-      ? `<span class="${CLASS[colorName(pct, cfg.thresholds, cfg.colors)]}">${shape}</span>`
-      : shape;
+    const paint = text => (cfg.colorsEnabled
+      ? `<span class="${CLASS[colorName(pct, cfg.thresholds, cfg.colors)]}">${text}</span>`
+      : text);
+    // With the bar hidden there is nothing left to carry the color, so the percentage takes it.
+    const shape = cfg.showBar[id]
+      ? paint(esc(bar(pct, cfg.bar.width, cfg.bar.filledChar, cfg.bar.emptyChar))) + " "
+      : "";
+    const percentage = cfg.showBar[id] ? `${clampPct(pct)}%` : paint(`${clampPct(pct)}%`);
 
     let usage = "";
     if (id === "ctx" && cfg.showUsage) {
-      const used = Math.round((pct / 100) * DEMO.contextSize);
-      usage = ` ${formatTokens(used)}/${formatTokens(DEMO.contextSize)}`;
+      const used = formatTokens(Math.round((pct / 100) * DEMO.contextSize));
+      usage = short ? ` ${used}` : ` ${used}/${formatTokens(DEMO.contextSize)}`;
     }
 
     const notes = [];
     const wantsReset = id === "5h" ? cfg.reset5h : id === "7d" ? cfg.reset7d : false;
     const wantsEta = id === "5h" ? cfg.eta5h : id === "7d" ? cfg.eta7d : false;
-    if (wantsReset) notes.push(`${formatDurationMs((id === "5h" ? DEMO.reset5h : DEMO.reset7d) * 1000)} until reset`);
+    if (wantsReset) {
+      const eta = formatDurationMs((id === "5h" ? DEMO.reset5h : DEMO.reset7d) * 1000);
+      notes.push(short ? `↻${eta}` : `${eta} until reset`);
+    }
     // A remembered value never gets the ETA: that usage predates the session, so there is
     // no honest rate to derive it from until fresh samples arrive.
     if (wantsEta && !stale) {
       const eta = depletionEta(pct, DEMO.durationMs);
-      if (eta) notes.push(`~${eta} to limit`);
+      if (eta) notes.push(short ? `~${eta}` : `~${eta} to limit`);
     }
 
-    const suffix = notes.length ? ` (${esc(notes.join(", "))})` : "";
-    return `${label}${gap}${painted} ${clampPct(pct)}%${usage}${suffix}`;
+    const suffix = notes.length
+      ? (short ? ` ${esc(notes.join(" "))}` : ` (${esc(notes.join(", "))})`)
+      : "";
+    return `${label}${gap}${shape}${percentage}${usage}${suffix}`;
   }
 
   function renderStats(cfg, pcts) {
@@ -808,6 +845,7 @@
     setText("bar-empty", json.bar?.emptyChar);
     setText("bar-stale", json.bar?.staleMarker);
     if (typeof json.layout?.joiner === "string") $("joiner").value = json.layout.joiner;
+    $("note-short").checked = json.layout?.noteStyle === "short";
 
     setCheck("state-on", json.state?.enabled);
     setNum("state-age", json.state?.maxAgeMinutes);
@@ -828,6 +866,7 @@
         state.show[seg.id] = seg.show !== false;
         state.row[seg.id] = Number.isFinite(seg.row) ? String(seg.row) : "";
 
+        if (seg.id in BAR_LABELS) setCheck(`bar-on-${seg.id}`, seg.showBar);
         if (seg.id === "ctx") setCheck("ctx-usage", seg.showUsage);
         if (seg.id === "5h") { setCheck("h5-reset", seg.showResetIn); setCheck("h5-eta", seg.showDepletion); }
         if (seg.id === "7d") { setCheck("d7-reset", seg.showResetIn); setCheck("d7-eta", seg.showDepletion); }
@@ -976,6 +1015,59 @@
       $("bar-empty").value = empty;
       refresh();
     });
+  }
+
+  /**
+   * A preset is nothing but a batch of control changes — everything it sets stays
+   * editable afterwards, and it deliberately leaves colors, thresholds, bar characters
+   * and the header's own parts alone, because those are taste, not layout.
+   */
+  const PRESETS = {
+    full: {
+      rows: { header: "", ctx: "", "5h": "", "7d": "", stats: "" },
+      bars: { ctx: true, "5h": true, "7d": true },
+      stats: ["cost", "duration", "burn", "lines"],
+      short: false, width: 10, ctxUsage: true, eta5h: true, eta7d: false, reset7d: true,
+    },
+    compact: {
+      rows: { header: "1", stats: "1", ctx: "2", "5h": "2", "7d": "2" },
+      bars: { ctx: true, "5h": true, "7d": true },
+      stats: ["cost", "duration", "burn", "lines"],
+      short: true, width: 8, ctxUsage: false, eta5h: true, eta7d: false, reset7d: true,
+    },
+    minimal: {
+      rows: { header: "1", ctx: "1", "5h": "1", "7d": "1", stats: "1" },
+      bars: { ctx: false, "5h": false, "7d": false },
+      // One line has room for the numbers or for the session tally, not both.
+      stats: ["cost"],
+      short: true, width: 8, ctxUsage: false, eta5h: false, eta7d: false, reset7d: false,
+    },
+  };
+
+  function applyPreset(name) {
+    const preset = PRESETS[name];
+    if (!preset) return;
+    // Order follows the rows, so a preset's line numbers read the same top to bottom.
+    state.order = Object.keys(preset.rows);
+    for (const [id, row] of Object.entries(preset.rows)) state.row[id] = row;
+    for (const [id, on] of Object.entries(preset.bars)) $(`bar-on-${id}`).checked = on;
+    $("note-short").checked = preset.short;
+    $("bar-width").value = String(preset.width);
+    $("ctx-usage").checked = preset.ctxUsage;
+    $("h5-reset").checked = true;
+    $("h5-eta").checked = preset.eta5h;
+    $("d7-reset").checked = preset.reset7d;
+    $("d7-eta").checked = preset.eta7d;
+    if (preset.stats) {
+      for (const key of state.statsOrder) state.stats[key].on = preset.stats.includes(key);
+      rebuildPartControls();
+    }
+    buildSegments();
+    refresh();
+  }
+
+  for (const button of document.querySelectorAll("button[data-preset]")) {
+    button.addEventListener("click", () => applyPreset(button.dataset.preset));
   }
 
   async function copyFrom(sourceId, okLabel) {

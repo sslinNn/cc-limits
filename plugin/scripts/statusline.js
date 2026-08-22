@@ -41,7 +41,7 @@ const DEFAULT_CONFIG = {
   thresholds: { yellow: 70, red: 90 },
   colors: { low: 'green', medium: 'yellow', high: 'red' },
   bar: { width: 10, filledChar: '▓', emptyChar: '░', staleMarker: '~' },
-  layout: { joiner: ' │ ' },
+  layout: { joiner: ' │ ', noteStyle: 'full', noteMarkers: { reset: '↻', limit: '~' } },
   git: { timeoutMs: 250 },
   state: {
     enabled: true,
@@ -68,6 +68,7 @@ const DEFAULT_CONFIG = {
       show: true,
       label: 'ctx',
       source: 'context_window.used_percentage',
+      showBar: true,
       showUsage: true,
       usage: {
         usedSource: 'context_window.current_usage',
@@ -81,6 +82,7 @@ const DEFAULT_CONFIG = {
       label: '5h ',
       source: 'rate_limits.five_hour.used_percentage',
       presenceSource: 'rate_limits.five_hour',
+      showBar: true,
       showResetIn: true,
       resetSource: 'rate_limits.five_hour.resets_at',
       showDepletion: true,
@@ -92,6 +94,7 @@ const DEFAULT_CONFIG = {
       label: '7d ',
       source: 'rate_limits.seven_day.used_percentage',
       presenceSource: 'rate_limits.seven_day',
+      showBar: true,
       showResetIn: true,
       resetSource: 'rate_limits.seven_day.resets_at',
       showDepletion: false,
@@ -573,12 +576,25 @@ function renderHeaderSegment(segment, data, config) {
   return rendered.join('');
 }
 
+/**
+ * The notes are by far the widest thing on a bar line, so `noteStyle: 'short'` trades
+ * the words for markers: `↻3h53m ~3h0m` instead of `(3h53m until reset, ~3h0m to limit)`.
+ * The markers are configurable because an ASCII-only terminal needs `r`/`~` where a
+ * Unicode one wants the arrow.
+ */
+function resolveNotes(segment, config) {
+  const style = segment.noteStyle ?? config.layout?.noteStyle ?? 'full';
+  const markers = { ...DEFAULT_CONFIG.layout.noteMarkers, ...(config.layout?.noteMarkers ?? {}) };
+  return { short: style === 'short', markers };
+}
+
 function renderBarSegment(segment, data, config, values) {
   const { pct, resetsAt, history, stale } = values;
   const thresholds = resolveThresholds(segment, config);
   const colors = resolveColors(segment, config);
   const c = color(pct, thresholds, colors, config.colorsEnabled);
-  const b = bar(pct, config.bar);
+  const off = c ? RESET : '';
+  const { short, markers } = resolveNotes(segment, config);
 
   let usage = '';
   if (segment.showUsage && segment.usage) {
@@ -586,24 +602,30 @@ function renderBarSegment(segment, data, config, values) {
     const total = getByPath(data, segment.usage.totalSource);
     const usedText = formatTokens(used);
     const totalText = formatTokens(total);
-    if (usedText && totalText) usage = ` ${usedText}/${totalText}`;
+    // Short form drops the window size: it never changes, so it carries no news.
+    if (usedText && totalText) usage = short ? ` ${usedText}` : ` ${usedText}/${totalText}`;
   }
 
   const notes = [];
   if (segment.showResetIn && resetsAt != null) {
     const eta = timeUntil(resetsAt);
-    if (eta) notes.push(eta === 'reset' ? 'reset' : `${eta} until reset`);
+    if (eta) notes.push(eta === 'reset' ? 'reset' : short ? `${markers.reset}${eta}` : `${eta} until reset`);
   }
   if (segment.showDepletion) {
     const eta = depletionEta(pct, stale ? null : data, history);
-    if (eta) notes.push(`~${eta} to limit`);
+    if (eta) notes.push(short ? `${markers.limit}${eta}` : `~${eta} to limit`);
   }
-  const suffix = notes.length ? ` (${notes.join(', ')})` : '';
+  const suffix = notes.length ? (short ? ` ${notes.join(' ')}` : ` (${notes.join(', ')})`) : '';
 
   // The marker takes the gap's place rather than adding a column, so bars stay aligned.
   const gap = stale ? (config.bar.staleMarker ?? '~') : ' ';
 
-  return `${segment.label}${gap}${c}${b}${c ? RESET : ''} ${pctLabel(pct)}${usage}${suffix}`;
+  // With the bar hidden there is nothing left to carry the color, so the percentage takes it.
+  const showBar = segment.showBar !== false;
+  const shape = showBar ? `${c}${bar(pct, config.bar)}${off} ` : '';
+  const percentage = showBar ? pctLabel(pct) : `${c}${pctLabel(pct)}${off}`;
+
+  return `${segment.label}${gap}${shape}${percentage}${usage}${suffix}`;
 }
 
 function renderStatsSegment(segment, data, config) {
@@ -1053,6 +1075,53 @@ function selfTest() {
   assert.strictEqual(compactLines[1].split(' │ ').length, 3);
   // the default layout still gives every segment its own line
   assert.strictEqual(render(fixture, DEFAULT_CONFIG).split('\n').length, 5);
+
+  // short notes trade the words for markers, and drop the context window's fixed size
+  const shortConfig = mergeConfig(DEFAULT_CONFIG, { layout: { noteStyle: 'short' } });
+  const shortOutput = render(fixture, shortConfig);
+  assert.ok(/5h .*18% ↻\dh\dm ~4h33m/.test(shortOutput));
+  assert.ok(shortOutput.includes('ctx') && shortOutput.includes(' 64K') && !shortOutput.includes('64K/200K'));
+  assert.ok(!shortOutput.includes('until reset') && !shortOutput.includes('to limit'));
+  // ...and a segment may keep the long form while the rest go short
+  const mixedOutput = render(fixture, mergeConfig(shortConfig, {
+    segments: [{ id: 'header' }, { id: 'ctx' }, { id: '5h', noteStyle: 'full' }, { id: '7d' }, { id: 'stats' }],
+  }));
+  assert.ok(mixedOutput.includes('until reset'));
+
+  // custom markers for terminals that can't draw the arrow
+  assert.ok(render(fixture, mergeConfig(DEFAULT_CONFIG, {
+    layout: { noteStyle: 'short', noteMarkers: { reset: 'r', limit: 'e' } },
+  })).match(/18% r\dh\dm e4h33m/));
+
+  // showBar:false drops the graphic, and the percentage inherits the color it carried
+  const noBarConfig = mergeConfig(DEFAULT_CONFIG, {
+    segments: [
+      { id: 'header' },
+      { id: 'ctx', showBar: false, showUsage: false },
+      { id: '5h', showBar: false, showResetIn: false, showDepletion: false },
+      { id: '7d', showBar: false, showResetIn: false },
+      { id: 'stats', show: false },
+    ],
+  });
+  const noBarLines = render(fixture, noBarConfig).split('\n');
+  assert.strictEqual(noBarLines[1], `ctx ${COLOR_CODES.green}32%${RESET}`);
+  assert.ok(!noBarLines[2].includes(DEFAULT_CONFIG.bar.emptyChar));
+  // the stale marker still takes the gap's place with no bar to precede
+  assert.ok(render(noLimits, noBarConfig, stateFixture(), NOW + 60).includes(`5h ~${COLOR_CODES.green}18%${RESET}`));
+
+  // the fully compact layout: one header line and one line of numbers
+  const tightLines = render(fixture, mergeConfig(DEFAULT_CONFIG, {
+    layout: { noteStyle: 'short' },
+    segments: [
+      { id: 'header', row: 1 },
+      { id: 'ctx', row: 2, label: 'ctx', showBar: false, showUsage: false },
+      { id: '5h', row: 2, label: '5h', showBar: false, showDepletion: false },
+      { id: '7d', row: 2, label: '7d', showBar: false },
+      { id: 'stats', row: 1 },
+    ],
+  })).split('\n');
+  assert.strictEqual(tightLines.length, 2);
+  assert.ok(tightLines[1].length < 60);
 
   console.log('self-test OK');
 }

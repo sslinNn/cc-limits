@@ -13,14 +13,11 @@
 </p>
 
 ```
-[Opus 5(H)] 📁 my-project | 🌿 main ↑2
-ctx ▓▓▓░░░░░░░ 32% 64K/200K
-5h  ▓▓░░░░░░░░ 18% (2h1m until reset, ~4h33m to limit)
-7d  ▓▓▓▓░░░░░░ 41% (6d3h until reset)
-$1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
+[Opus 5(H)] 📁 my-project | 🌿 main ↑2 │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
+ctx ▓▓▓░░░░░ 32% 64K │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
 ```
 
-Green under 70%, yellow from 70, red from 90 — per bar, so the one that's actually in trouble is the one that changes color.
+Two lines, because a statusline you glance at shouldn't cost a third of a short terminal. Green under 70%, yellow from 70, red from 90 — per bar, so the one that's actually in trouble is the one that changes color. Want it spread out over five lines, or squeezed onto one? One button either way.
 
 ---
 
@@ -62,7 +59,7 @@ Already using a different statusline? cc-limits leaves it alone and hands you a 
 Claude Code only puts `rate_limits` in the payload after a session's first API response — so historically the 5h/7d bars had nothing to draw exactly when you needed them most: at the start, deciding whether to begin the big task. cc-limits remembers the last values it saw and draws them with a `~` marker until the live numbers land:
 
 ```
-5h ~▓▓░░░░░░░░ 18% (2h0m until reset)
+5h~▓░░░░░░░ 18% ↻2h0m
 ```
 
 A remembered value is dropped the moment its window resets (the number would be a lie) or once it's more than 12 hours old. Remembered values never show an ETA — that usage predates the session, so estimating from the session's runtime would invent a burn rate out of nothing.
@@ -73,23 +70,26 @@ Two ways to the same result. No file editing either way.
 
 **Answer a few questions:** run `/cc-limits:setup` and Claude writes the config for you.
 
-**Or see every option at once:** open [`plugin/configurator.html`](plugin/configurator.html) in a browser — one self-contained page, no server, no install, no network. Every setting laid out with a live preview of your statusline, plus sliders that show exactly where your color thresholds kick in. Hit **Copy command**, paste into Claude Code:
+**Or see every option at once:** run `/cc-limits:configure` — it opens [`plugin/configurator.html`](plugin/configurator.html) in your browser with your current config already loaded. One self-contained page, no server, no install, no network. Every setting laid out with a live preview of your statusline, plus sliders that show exactly where your color thresholds kick in, and a **Reset to defaults** button when you've gone too far. Hit **Copy command**, paste into Claude Code:
 
 ```
 /cc-limits:apply {"colorsEnabled":true,...}
 ```
 
-`/cc-limits:apply` validates it, tells you in plain language what's about to change, and writes the file. Already have a config? Paste it into the page's **Start from your current config** box and every control jumps to your settings.
+`/cc-limits:apply` validates it, tells you in plain language what's about to change, and writes the file. Opened the page some other way? Paste any config into its **Start from your current config** box — a wrapped terminal dump or a fenced block copied out of chat parses fine.
 
-### Compact layouts
+### Layouts
 
-Five lines is a lot of terminal. The configurator has three buttons — **Full**, **Compact**, **Minimal** — and each is just a batch of settings you can keep tweaking afterwards.
+The default is two lines. The configurator has **Full**, **Compact** and **Minimal** as buttons — each is just a batch of settings you can keep tweaking afterwards.
 
-**Compact — two lines:**
+**Full — five lines**, one per segment, the pre-1.4 look:
 
 ```
-[Opus 5(H)] 📁 my-project | 🌿 main │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min
-ctx ▓▓▓░░░░░ 32% │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
+[Opus 5(H)] 📁 my-project | 🌿 main
+ctx ▓▓▓░░░░░░░ 32% 64K/200K
+5h  ▓▓░░░░░░░░ 18% (2h1m until reset, ~4h33m to limit)
+7d  ▓▓▓▓░░░░░░ 41% (6d3h until reset)
+$1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
 ```
 
 **Minimal — one:**
@@ -98,11 +98,11 @@ ctx ▓▓▓░░░░░ 32% │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h
 [Opus 5(H)] 📁 my-project | 🌿 main │ ctx 32% │ 5h 18% ↻2h1m │ 7d 41% │ $1.23
 ```
 
-Three independent knobs get you there:
+Three independent knobs do the work:
 
-- **Share lines.** Segments with the same `"row"` number render side by side, joined by `layout.joiner` (default ` │ `). No `row` means the segment keeps a line to itself.
-- **Shorten the notes.** `"layout": { "noteStyle": "short" }` turns `(3h53m until reset, ~3h0m to limit)` into `↻3h53m ~3h0m`, and drops the never-changing context-window size from the token count. Set it per segment to mix both styles; pick your own symbols with `"noteMarkers": { "reset": "r", "limit": "~" }` if your terminal can't draw the arrow.
-- **Drop the bar.** `"showBar": false` leaves just `5h 40%` — and the percentage takes over the color the bar was carrying.
+- **Lines.** Segments with the same `"row"` number render side by side, joined by `layout.joiner` (default ` │ `). `"row": null` puts one back on a line of its own — spell it out, since a missing `row` inherits the default's.
+- **Note length.** `"layout": { "noteStyle": "full" }` spells the notes out — `(3h53m until reset, ~3h0m to limit)` instead of `↻3h53m ~3h0m` — and brings back the context window's total next to the token count. Set it per segment to mix both styles; pick your own symbols with `"noteMarkers": { "reset": "r", "limit": "~" }` if your terminal can't draw the arrow.
+- **Bars.** `"showBar": false` leaves just `5h 40%` — and the percentage takes over the color the bar was carrying.
 
 ### Terminal title
 
@@ -116,20 +116,21 @@ Placeholders: `{ctx}` `{5h}` `{7d}` `{cost}` `{dir}` `{model}` — percentages a
 
 ### Clickable links
 
-`{ "key": "dir", "link": true }` turns the directory into an OSC8 link to the folder; `{ "key": "branch", "link": true }` links the branch to its remote on GitHub/GitLab. Terminals without OSC8 just print the text. The branch link costs one extra `git remote get-url` per render, so it's off by default.
+The directory is an OSC8 link to the folder and the branch links to its remote on GitHub/GitLab — click either straight from the statusline. Terminals without OSC8 support just print the text, so there's nothing to turn off for them. If you'd rather save the one extra `git remote get-url` the branch link costs per render, set `{ "key": "branch", "link": false }`.
 
 ### Defaults
 
 | Setting | Default |
 |---|---|
-| Segments (in order) | header (model, dir, branch, worktree), ctx, 5h, 7d, stats |
+| Segments (in order) | header (model, dir, branch, worktree) + stats on line 1; ctx, 5h, 7d on line 2 |
 | Colors | green `<70%`, yellow `70–89%`, red `≥90%` |
-| Bar | width 10, `▓` filled / `░` empty |
+| Bar | width 8, `▓` filled / `░` empty |
 | Countdown to reset | 5h and 7d |
 | ETA to limit | 5h |
 | Context tokens | shown |
+| Clickable dir and branch | on |
 | Icons | 📁 dir · 🌿 branch · 🌳 worktree · ⏱ duration · 🔥 burn rate |
-| Layout | one line per segment, full-length notes, bars shown |
+| Layout | two lines, short notes, bars shown |
 | Remembered limits | on, `~` marker, 12-hour max age |
 | Terminal title | off |
 

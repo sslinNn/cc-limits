@@ -15,47 +15,47 @@ Schema:
   "colorsEnabled": true,
   "thresholds": { "yellow": 70, "red": 90 },
   "colors": { "low": "green", "medium": "yellow", "high": "red" },
-  "bar": { "width": 10, "filledChar": "▓", "emptyChar": "░", "staleMarker": "~" },
-  "layout": { "joiner": " │ ", "noteStyle": "full", "noteMarkers": { "reset": "↻", "limit": "~" } },
+  "bar": { "width": 8, "filledChar": "▓", "emptyChar": "░", "staleMarker": "~" },
+  "layout": { "joiner": " │ ", "noteStyle": "short", "noteMarkers": { "reset": "↻", "limit": "~" } },
   "git": { "timeoutMs": 250 },
   "state": { "enabled": true, "minSampleSeconds": 30, "maxHistory": 60, "maxAgeMinutes": 720 },
   "terminalTitle": { "enabled": false, "template": "ctx {ctx}% · 5h {5h}% · {dir}" },
   "segments": [
-    { "id": "header", "type": "header", "show": true,
+    { "id": "header", "type": "header", "show": true, "row": 1,
       "parts": [
         { "key": "model", "bracket": true, "effort": true },
-        { "key": "dir", "icon": "📁", "separator": " ", "link": false },
-        { "key": "branch", "icon": "🌿", "separator": " | ", "aheadBehind": true, "link": false },
+        { "key": "dir", "icon": "📁", "separator": " ", "link": true },
+        { "key": "branch", "icon": "🌿", "separator": " | ", "aheadBehind": true, "link": true },
         { "key": "worktree", "icon": "🌳", "separator": " | " }
       ] },
-    { "id": "ctx", "type": "bar", "show": true, "label": "ctx",
-      "source": "context_window.used_percentage",
-      "showBar": true, "showUsage": true,
-      "usage": { "usedSource": "context_window.current_usage",
-                 "totalSource": "context_window.context_window_size" } },
-    { "id": "5h", "type": "bar", "show": true, "label": "5h ",
-      "source": "rate_limits.five_hour.used_percentage",
-      "presenceSource": "rate_limits.five_hour",
-      "showBar": true, "showResetIn": true, "resetSource": "rate_limits.five_hour.resets_at",
-      "showDepletion": true },
-    { "id": "7d", "type": "bar", "show": true, "label": "7d ",
-      "source": "rate_limits.seven_day.used_percentage",
-      "presenceSource": "rate_limits.seven_day",
-      "showBar": true, "showResetIn": false, "resetSource": "rate_limits.seven_day.resets_at",
-      "showDepletion": false },
-    { "id": "stats", "type": "stats", "show": true, "separator": " · ",
+    { "id": "stats", "type": "stats", "show": true, "row": 1, "separator": " · ",
       "parts": [
         { "key": "cost" },
         { "key": "duration", "icon": "⏱" },
         { "key": "burn", "icon": "🔥" },
         { "key": "lines" }
-      ] }
+      ] },
+    { "id": "ctx", "type": "bar", "show": true, "row": 2, "label": "ctx",
+      "source": "context_window.used_percentage",
+      "showBar": true, "showUsage": true,
+      "usage": { "usedSource": "context_window.current_usage",
+                 "totalSource": "context_window.context_window_size" } },
+    { "id": "5h", "type": "bar", "show": true, "row": 2, "label": "5h",
+      "source": "rate_limits.five_hour.used_percentage",
+      "presenceSource": "rate_limits.five_hour",
+      "showBar": true, "showResetIn": true, "resetSource": "rate_limits.five_hour.resets_at",
+      "showDepletion": true },
+    { "id": "7d", "type": "bar", "show": true, "row": 2, "label": "7d",
+      "source": "rate_limits.seven_day.used_percentage",
+      "presenceSource": "rate_limits.seven_day",
+      "showBar": true, "showResetIn": true, "resetSource": "rate_limits.seven_day.resets_at",
+      "showDepletion": false }
   ]
 }
 ```
 
 Notes on the schema:
-- `segments` is the **complete list** of what renders, in that order. Omitting an id hides it — same effect as `"show": false`. When you write the file, always write the full list of all five ids (`header`, `ctx`, `5h`, `7d`, `stats`), using `"show": false` for anything the user wants hidden, never by leaving it out — that way nothing is accidentally lost if they ask you to tweak just one thing later.
+- `segments` is the **complete list** of what renders, in that order. Omitting an id hides it — same effect as `"show": false`. When you write the file, always write the full list of all five ids (`header`, `stats`, `ctx`, `5h`, `7d`), using `"show": false` for anything the user wants hidden, never by leaving it out — that way nothing is accidentally lost if they ask you to tweak just one thing later.
 - `thresholds`/`colors` on a segment (e.g. `{ "id": "5h", "thresholds": { "red": 50 } }`) override the global ones for just that segment. Only add these if the user actually wants per-segment differences — don't add them by default.
 - `colors` values must be one of: `green`, `yellow`, `red`, `blue`, `magenta`, `cyan`, `white`.
 - `header.parts` controls the first line: which of `model`/`dir`/`branch`/`worktree` show, in what order, with what icon and separator before them (the first part in the list never gets a separator).
@@ -66,28 +66,33 @@ Notes on the schema:
 - `stats.parts` accepts `cost`, `duration`, `burn` (tokens/min), `lines` (`+added -removed`), and `apiTime` (API time as a share of session time). Each part renders only when its data is present, and the whole segment disappears when none is.
 - Bar segments accept `"showUsage": true` (token counts next to the percentage — only meaningful for `ctx`, whose `usage` block points at the token fields) and `"showDepletion": true` (an `~ETA to limit` estimate at the session's current pace — only meaningful for rate-limit bars).
 - Bar segments also accept `"showBar": false`, which drops the bar graphic and leaves `5h 40%` — the percentage then takes the color the bar was carrying. Their `label` is padded (`"5h "`, `"7d "`) so stacked bars line up under `ctx`; drop the padding when they share a line, where it is just a stray space.
-- Any segment accepts `"row": <number>`. Segments sharing a row render on one line joined by `layout.joiner`; a segment without a row keeps a line to itself.
+- Any segment accepts `"row": <number>`. Segments sharing a row render on one line joined by `layout.joiner`. The default puts `header`+`stats` on row 1 and the three bars on row 2 — write `"row": null` to pull a segment back onto a line of its own, since leaving the key out inherits the default's row.
 - `layout.noteStyle` is `"full"` (default) or `"short"`. Short renders the notes as `↻3h53m ~3h0m` instead of `(3h53m until reset, ~3h0m to limit)`, and drops the fixed window size from `ctx`'s token count (`64K` rather than `64K/200K`). A segment may carry its own `noteStyle` to override the global one. `layout.noteMarkers` sets the two symbols, for terminals that can't draw the arrow.
 - `git.timeoutMs` caps how long each git call may take before the branch info is silently dropped.
 - `state` controls the remembered rate-limit windows kept in `~/.claude/cc-limits-state.json`. They let the 5h/7d bars show their last known value (prefixed with `bar.staleMarker`) before Claude Code sends live limits in a new session, and they hold the sample history that makes the `~ETA to limit` a measurement instead of a guess. `maxAgeMinutes` is how long a remembered value stays trustworthy; `minSampleSeconds` and `maxHistory` control sampling. `"enabled": false` disables the file entirely — bars then hide until live limits arrive, as they did before.
 - `terminalTitle` optionally writes the same numbers to the terminal's title (useful when Claude Code is in a background tab). Placeholders: `{ctx}`, `{5h}`, `{7d}`, `{cost}`, `{dir}`, `{model}`. It writes to `/dev/tty`, so it silently does nothing on Windows or without a controlling terminal. Off by default — only enable it if the user asks.
 
-## Compact layouts
+## Layout presets
 
-`row`, `noteStyle` and `showBar` together are how the five-line default shrinks — `row` alone only moves lines around. When the user says the statusline takes too much room, offer one of these as a starting point, then let them tweak:
+`row`, `noteStyle` and `showBar` are what change how much room the statusline takes. The defaults are already the compact two-line layout; these are the other two shapes worth offering:
 
-- **Compact (2 lines):** `header` and `stats` on `"row": 1`; `ctx`/`5h`/`7d` on `"row": 2` with unpadded labels (`"5h"`, `"7d"`); `layout.noteStyle: "short"`; `bar.width: 8`; `ctx` `"showUsage": false`.
+- **Stacked (5 lines)** — the pre-1.4 look, for people who want every number on its own line: `"row": null` on all five segments, `layout.noteStyle: "full"`, `bar.width: 10`, and the padded labels `"5h "` / `"7d "` so the bars line up under `ctx`. Note the explicit `null`: leaving `row` out inherits the default's row instead.
 
   ```
-  [Opus 5(H)] 📁 my-project | 🌿 main │ $1.23 · ⏱ 1h0m · 🔥 1.1K/min
-  ctx ▓▓▓░░░░░ 32% │ 5h ▓░░░░░░░ 18% ↻2h1m ~4h33m │ 7d ▓▓▓░░░░░ 41% ↻6d3h
+  [Opus 5(H)] 📁 my-project | 🌿 main
+  ctx ▓▓▓░░░░░░░ 32% 64K/200K
+  5h  ▓▓░░░░░░░░ 18% (2h1m until reset, ~4h33m to limit)
+  7d  ▓▓▓▓░░░░░░ 41% (6d3h until reset)
+  $1.23 · ⏱ 1h0m · 🔥 1.1K/min · +320 -85
   ```
 
-- **Minimal (1 line):** every segment on `"row": 1`; `"showBar": false` on all three bars; `noteStyle: "short"`; only the 5h reset note kept; `stats` trimmed to `cost`.
+- **Minimal (1 line)** — every segment on `"row": 1`, `"showBar": false` on all three bars, only the 5h reset note kept, `stats` trimmed to `cost`.
 
   ```
   [Opus 5(H)] 📁 my-project | 🌿 main │ ctx 32% │ 5h 18% ↻2h1m │ 7d 41% │ $1.23
   ```
+
+The visual configurator has all three as buttons, plus **Reset to defaults**. `/cc-limits:configure` opens it with the user's live config already loaded.
 
 ## Flow
 
@@ -97,12 +102,12 @@ Notes on the schema:
 
 2. **Ask in small groups, not one long form.** Suggested groups — ask conversationally, offer the current/default value as the easy "keep it" answer, and let the user skip anything they don't care about:
    - Segments & order: which of header, context, 5-hour limit, 7-day limit, stats do they want shown, and in what order?
-   - Layout: one line per segment (default), or should some share a line? If they say it takes too much space, offer the compact or minimal layout above rather than only moving rows around — `row` alone doesn't shorten anything.
+   - Layout: keep the default two lines, spread out to five, or squeeze down to one? Use the presets above rather than only moving rows around — `row` alone doesn't shorten anything.
    - Header details: which of model/dir/branch/worktree to include, keep the icons, and do they want the effort badge, `↑↓` ahead/behind, and clickable links?
    - Stats details: which of cost/duration/burn rate/lines changed/API time.
    - Colors: keep color on? If so, keep green/yellow/red or use different colors from the supported palette?
    - Thresholds: keep 70/90 globally, or change them? Only ask about per-segment overrides if they show interest in more granularity.
-   - Bar style: keep width 10 and ▓/░, or change width/characters (offer a couple of alternatives like `#`/`-` for plain-ASCII terminals)?
+   - Bar style: keep width 8 and ▓/░, or change width/characters (offer a couple of alternatives like `#`/`-` for plain-ASCII terminals)?
    - Reset-time and ETA display: which bars show "(Xh Ym until reset)", and which show "~ETA to limit".
    - Only if they bring it up or seem interested: the terminal title, and whether to keep remembering limits between sessions.
 
@@ -110,14 +115,14 @@ Notes on the schema:
    - Thresholds must be 0–100, and `yellow < red`.
    - Bar width should be a small positive integer (roughly 4–40).
    - Colors must be from the supported palette listed above — if the user names something else, tell them the supported list and ask again.
-   - The written `segments` array must include all five ids (`header`, `ctx`, `5h`, `7d`, `stats`), using `show: false` rather than omission for anything hidden.
+   - The written `segments` array must include all five ids (`header`, `stats`, `ctx`, `5h`, `7d`), using `show: false` rather than omission for anything hidden.
    - `showDepletion` only belongs on rate-limit bars, `showUsage` only on `ctx`.
 
 4. **Write the file.** Construct the complete config object (all top-level keys present, mirroring the schema above — merge the user's answered changes onto the current values/defaults yourself before writing) and use the Write tool to save it, pretty-printed, to `~/.claude/cc-limits-config.json`. Create `~/.claude/` first if it doesn't exist.
 
 5. **Confirm.** Show a short human-readable summary of what changed (not a raw JSON dump). Mention that this takes effect on the very next statusline render — no session restart needed (unlike the install step). Mention they can run `/cc-limits:setup` again anytime, and that deleting `~/.claude/cc-limits-config.json` resets everything to defaults.
 
-If at any point the user seems to want to see the options laid out rather than answer questions one by one, point them at `${CLAUDE_PLUGIN_ROOT}/configurator.html` — a self-contained page they open in a browser, showing every option with a live preview. Its **Copy command** button produces a `/cc-limits:apply …` line that writes the config for them. Offer it; don't push it.
+If at any point the user seems to want to see the options laid out rather than answer questions one by one, point them at `/cc-limits:configure` — it opens a self-contained page in their browser with their current config already loaded, showing every option with a live preview. Its **Copy command** button produces a `/cc-limits:apply …` line that writes the config for them. Offer it; don't push it.
 
 If the user asks to see their current config (usually to paste it into that page), print the contents of `~/.claude/cc-limits-config.json` as-is, or tell them there isn't one yet and they're on the defaults.
 

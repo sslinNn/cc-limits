@@ -293,6 +293,7 @@
     <h1>cc-limits Configurator</h1>
     <p class="lede">Every option the statusline reads, with a live preview. Nothing here touches your machine — you copy the result into the config file yourself.</p>
     <span class="path">~/.claude/cc-limits-config.json</span>
+    <button class="tiny" id="reset" title="Put every control back to the plugin's defaults">Reset to defaults</button>
   </header>
 
   <div class="cols">
@@ -304,7 +305,7 @@
           <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
             <span class="lbl" style="margin-right: 2px;">Layout</span>
             <button class="tiny" data-preset="full">Full · 5 lines</button>
-            <button class="tiny" data-preset="compact">Compact · 2 lines</button>
+            <button class="tiny" data-preset="compact">Compact · 2 lines <span class="desc" style="margin:0">default</span></button>
             <button class="tiny" data-preset="minimal">Minimal · 1 line</button>
           </div>
           <div id="segments" class="body" style="padding: 0; gap: 8px;"></div>
@@ -442,7 +443,7 @@
       <section class="card" style="margin: 0;">
         <h2>Start from your current config</h2>
         <div class="body">
-          <p class="note">Ask Claude Code to <code>show my cc-limits config</code>, paste it here, and every control below jumps to your settings.</p>
+          <p class="note">Run <code>/cc-limits:configure</code> in Claude Code and it opens this page with your live config already loaded. Failing that, ask it to <code>show my cc-limits config</code> and paste the JSON here — a wrapped terminal dump or a fenced block from chat is fine, it gets cleaned up.</p>
           <textarea id="load-input" rows="3" placeholder='{ "colorsEnabled": true, ... }' style="font: 400 12px/1.5 'IBM Plex Mono', monospace; resize: vertical;"></textarea>
           <div style="display: flex; gap: 8px; align-items: center;">
             <button id="load">Load</button>
@@ -454,6 +455,7 @@
   </div>
 </div>
 
+<!-- cc-limits:injected-config -->
 <script>
 (() => {
   "use strict";
@@ -505,7 +507,45 @@
     { key: "apiTime", name: "API time share", icon: null, sample: "api 33%" },
   ];
 
-  // Mutable UI state, seeded with the statusline's own defaults.
+  /**
+   * The statusline's own `DEFAULT_CONFIG`, verbatim. Every control starts from this
+   * rather than from hardcoded `value=`/`checked` attributes, so "reset" and "what a
+   * fresh install looks like" are the same code path — and there is one place to update
+   * when the defaults move.
+   */
+  const DEFAULTS = {
+    colorsEnabled: true,
+    thresholds: { yellow: 70, red: 90 },
+    colors: { low: "green", medium: "yellow", high: "red" },
+    bar: { width: 8, filledChar: "▓", emptyChar: "░", staleMarker: "~" },
+    layout: { joiner: " │ ", noteStyle: "short", noteMarkers: { reset: "↻", limit: "~" } },
+    git: { timeoutMs: 250 },
+    state: { enabled: true, minSampleSeconds: 30, maxHistory: 60, maxAgeMinutes: 720 },
+    terminalTitle: { enabled: false, template: "ctx {ctx}% · 5h {5h}% · {dir}" },
+    segments: [
+      { id: "header", type: "header", show: true, row: 1, parts: [
+        { key: "model", bracket: true, effort: true },
+        { key: "dir", icon: "📁", separator: " ", link: true },
+        { key: "branch", icon: "🌿", separator: " | ", aheadBehind: true, link: true },
+        { key: "worktree", icon: "🌳", separator: " | " },
+      ] },
+      { id: "stats", type: "stats", show: true, row: 1, separator: " · ", parts: [
+        { key: "cost" }, { key: "duration", icon: "⏱" }, { key: "burn", icon: "🔥" }, { key: "lines" },
+      ] },
+      { id: "ctx", type: "bar", show: true, row: 2, label: "ctx",
+        source: "context_window.used_percentage", showBar: true, showUsage: true,
+        usage: { usedSource: "context_window.current_usage", totalSource: "context_window.context_window_size" } },
+      { id: "5h", type: "bar", show: true, row: 2, label: "5h",
+        source: "rate_limits.five_hour.used_percentage", presenceSource: "rate_limits.five_hour",
+        showBar: true, showResetIn: true, resetSource: "rate_limits.five_hour.resets_at", showDepletion: true },
+      { id: "7d", type: "bar", show: true, row: 2, label: "7d",
+        source: "rate_limits.seven_day.used_percentage", presenceSource: "rate_limits.seven_day",
+        showBar: true, showResetIn: true, resetSource: "rate_limits.seven_day.resets_at", showDepletion: false },
+    ],
+  };
+
+  // Mutable UI state; every field is overwritten from DEFAULTS (or the injected config)
+  // before the first render.
   const state = {
     order: ["header", "ctx", "5h", "7d", "stats"],
     headerOrder: ["model", "dir", "branch", "worktree"],
@@ -620,7 +660,9 @@
   }
 
   function segmentsJson(cfg) {
-    const withRow = (obj, id) => (state.row[id] === "" ? obj : { ...obj, row: Number(state.row[id]) });
+    // An own-line segment writes `row: null` rather than leaving the key out: the config
+    // merges onto the defaults by key, and the defaults now carry rows of their own.
+    const withRow = (obj, id) => ({ ...obj, row: state.row[id] === "" ? null : Number(state.row[id]) });
 
     // `5h `/`7d ` are padded to line up under `ctx` when the bars are stacked. Side by
     // side that padding is just a stray space, so a shared line drops it.
@@ -1029,11 +1071,12 @@
       stats: ["cost", "duration", "burn", "lines"],
       short: false, width: 10, ctxUsage: true, eta5h: true, eta7d: false, reset7d: true,
     },
+
     compact: {
       rows: { header: "1", stats: "1", ctx: "2", "5h": "2", "7d": "2" },
       bars: { ctx: true, "5h": true, "7d": true },
       stats: ["cost", "duration", "burn", "lines"],
-      short: true, width: 8, ctxUsage: false, eta5h: true, eta7d: false, reset7d: true,
+      short: true, width: 8, ctxUsage: true, eta5h: true, eta7d: false, reset7d: true,
     },
     minimal: {
       rows: { header: "1", ctx: "1", "5h": "1", "7d": "1", stats: "1" },
@@ -1070,6 +1113,12 @@
     button.addEventListener("click", () => applyPreset(button.dataset.preset));
   }
 
+  $("reset").addEventListener("click", () => {
+    applyConfig(DEFAULTS);
+    $("load-status").textContent = "Back to the plugin's defaults.";
+    $("load-status").className = "note ok";
+  });
+
   async function copyFrom(sourceId, okLabel) {
     let ok = false;
     try {
@@ -1095,6 +1144,52 @@
   $("send").addEventListener("click", () => copyFrom("command", "Copied — paste it into Claude Code"));
   $("copy").addEventListener("click", () => copyFrom("json", "Copied"));
 
+  /**
+   * Drop the raw control characters a paste can carry inside a string literal. A
+   * terminal that hard-wraps a long line inserts a newline mid-string, and `JSON.parse`
+   * rejects the whole document over it — heal it rather than blaming the reader.
+   */
+  function healControlChars(text) {
+    let out = "";
+    let inString = false;
+    let escaped = false;
+    for (const ch of text) {
+      if (escaped) { out += ch; escaped = false; continue; }
+      if (inString && ch === "\\") { out += ch; escaped = true; continue; }
+      if (ch === '"') { inString = !inString; out += ch; continue; }
+      if (inString && ch < " ") { if (ch === "\t") out += " "; continue; }
+      out += ch;
+    }
+    return out;
+  }
+
+  /**
+   * People paste whatever they have to hand: a slash command, a fenced block copied out
+   * of chat, a wrapped terminal dump, a hand-edited file with a trailing comma. Try the
+   * text as-is first, then repair progressively — the first thing that parses wins, so a
+   * config that was already valid is never rewritten by a guess.
+   */
+  function parseConfigText(raw) {
+    const stripped = raw.trim()
+      .replace(/^\/\S*apply\s+/, "")
+      .replace(/^```[a-z]*\s*\n?/i, "")
+      .replace(/\n?```$/, "")
+      .trim();
+
+    const attempts = [
+      stripped,
+      healControlChars(stripped),
+      // Trailing commas, and the curly quotes some chat clients substitute.
+      healControlChars(stripped).replace(/[\u201C\u201D]/g, '"').replace(/,(\s*[}\]])/g, "$1"),
+    ];
+
+    let failure;
+    for (const attempt of attempts) {
+      try { return JSON.parse(attempt); } catch (error) { failure ??= error; }
+    }
+    throw failure;
+  }
+
   $("load").addEventListener("click", () => {
     const status = $("load-status");
     const raw = $("load-input").value.trim();
@@ -1104,9 +1199,7 @@
       return;
     }
     try {
-      // Tolerate a pasted command line as readily as bare JSON — people copy back
-      // whatever they have to hand.
-      applyConfig(JSON.parse(raw.replace(/^\/\S*apply\s+/, "")));
+      applyConfig(parseConfigText(raw));
       status.textContent = "Loaded — the controls now match your config.";
       status.className = "note ok";
     } catch (error) {
@@ -1115,7 +1208,15 @@
     }
   });
 
-  refresh();
+  // `/cc-limits:configure` writes a copy of this page with the live config injected;
+  // opened straight from the plugin folder there is nothing to read, so show the
+  // defaults instead. Either way the controls start from a real, complete config.
+  const injected = window.CC_LIMITS_CONFIG;
+  applyConfig(injected && typeof injected === "object" ? injected : DEFAULTS);
+  if (injected) {
+    $("load-status").textContent = "Loaded from ~/.claude/cc-limits-config.json — every control matches your live statusline.";
+    $("load-status").className = "note ok";
+  }
 })();
 </script>
 <!-- artifact:end -->

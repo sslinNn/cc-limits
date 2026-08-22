@@ -36,12 +36,17 @@ const MIN_HISTORY_SPAN_MINUTES = 2;
 // A drop this large means the window rolled over, even if resets_at didn't tell us.
 const ROLLOVER_DROP_PCT = 1;
 
+/**
+ * Two lines by default: the header and the session tally on the first, the three bars
+ * side by side on the second. Five stacked lines read beautifully and cost a third of a
+ * short terminal, which is a bad trade for something you glance at.
+ */
 const DEFAULT_CONFIG = {
   colorsEnabled: true,
   thresholds: { yellow: 70, red: 90 },
   colors: { low: 'green', medium: 'yellow', high: 'red' },
-  bar: { width: 10, filledChar: '▓', emptyChar: '░', staleMarker: '~' },
-  layout: { joiner: ' │ ', noteStyle: 'full', noteMarkers: { reset: '↻', limit: '~' } },
+  bar: { width: 8, filledChar: '▓', emptyChar: '░', staleMarker: '~' },
+  layout: { joiner: ' │ ', noteStyle: 'short', noteMarkers: { reset: '↻', limit: '~' } },
   git: { timeoutMs: 250 },
   state: {
     enabled: true,
@@ -55,17 +60,33 @@ const DEFAULT_CONFIG = {
       id: 'header',
       type: 'header',
       show: true,
+      row: 1,
       parts: [
         { key: 'model', bracket: true, effort: true },
-        { key: 'dir', icon: '📁', separator: ' ', link: false },
-        { key: 'branch', icon: '🌿', separator: ' | ', aheadBehind: true, link: false },
+        { key: 'dir', icon: '📁', separator: ' ', link: true },
+        { key: 'branch', icon: '🌿', separator: ' | ', aheadBehind: true, link: true },
         { key: 'worktree', icon: '🌳', separator: ' | ' },
       ],
     },
     {
+      id: 'stats',
+      type: 'stats',
+      show: true,
+      row: 1,
+      separator: ' · ',
+      parts: [
+        { key: 'cost' },
+        { key: 'duration', icon: '⏱' },
+        { key: 'burn', icon: '🔥' },
+        { key: 'lines' },
+      ],
+    },
+    // The bar labels carry no alignment padding: side by side there is nothing to align to.
+    {
       id: 'ctx',
       type: 'bar',
       show: true,
+      row: 2,
       label: 'ctx',
       source: 'context_window.used_percentage',
       showBar: true,
@@ -79,7 +100,8 @@ const DEFAULT_CONFIG = {
       id: '5h',
       type: 'bar',
       show: true,
-      label: '5h ',
+      row: 2,
+      label: '5h',
       source: 'rate_limits.five_hour.used_percentage',
       presenceSource: 'rate_limits.five_hour',
       showBar: true,
@@ -91,25 +113,14 @@ const DEFAULT_CONFIG = {
       id: '7d',
       type: 'bar',
       show: true,
-      label: '7d ',
+      row: 2,
+      label: '7d',
       source: 'rate_limits.seven_day.used_percentage',
       presenceSource: 'rate_limits.seven_day',
       showBar: true,
       showResetIn: true,
       resetSource: 'rate_limits.seven_day.resets_at',
       showDepletion: false,
-    },
-    {
-      id: 'stats',
-      type: 'stats',
-      show: true,
-      separator: ' · ',
-      parts: [
-        { key: 'cost' },
-        { key: 'duration', icon: '⏱' },
-        { key: 'burn', icon: '🔥' },
-        { key: 'lines' },
-      ],
     },
   ],
 };
@@ -773,7 +784,8 @@ function main() {
 }
 
 function selfTest() {
-  const defaultBar = DEFAULT_CONFIG.bar;
+  // A round width keeps the expectations readable; the default's own width is 8.
+  const defaultBar = { ...DEFAULT_CONFIG.bar, width: 10 };
   assert.strictEqual(bar(0, defaultBar), '░'.repeat(10));
   assert.strictEqual(bar(100, defaultBar), '▓'.repeat(10));
   assert.strictEqual(bar(50, defaultBar), '▓▓▓▓▓░░░░░');
@@ -869,16 +881,16 @@ function selfTest() {
   const withLimits = render(fixture, DEFAULT_CONFIG);
   assert.ok(withLimits.includes('ctx'));
   // the weekly window's countdown reads in days, which is why it is on by default
-  assert.ok(/7d .*6d23h until reset/.test(render({
+  assert.ok(/7d .*↻6d23h/.test(render({
     ...fixture,
     rate_limits: { ...fixture.rate_limits, seven_day: { used_percentage: 41, resets_at: Date.now() / 1000 + 604740 } },
   }, DEFAULT_CONFIG)));
   assert.ok(withLimits.includes('5h'));
   assert.ok(withLimits.includes('7d'));
 
-  // ctx carries its token counts, the 5h bar carries both reset and depletion notes
-  assert.ok(withLimits.includes('64K/200K'));
-  assert.ok(/5h .*\dm until reset, ~4h33m to limit/.test(withLimits));
+  // ctx carries its token count, the 5h bar carries both reset and depletion notes
+  assert.ok(withLimits.includes('32% 64K'));
+  assert.ok(/5h .*↻\dh\dm ~4h33m/.test(withLimits));
 
   // stats renders cost, duration, burn rate and the line delta
   assert.ok(withLimits.includes('$1.23'));
@@ -981,14 +993,14 @@ function selfTest() {
   const noLimits = { model: fixture.model, workspace: fixture.workspace, context_window: fixture.context_window, cost: fixture.cost };
   const remembered = stateFixture();
   const staleOutput = render(noLimits, DEFAULT_CONFIG, remembered, NOW + 60);
-  assert.ok(staleOutput.includes('5h ~'));
+  assert.ok(staleOutput.includes('5h~'));
   assert.ok(staleOutput.includes('18%'));
   // a remembered percentage never gets the session-elapsed estimate: that usage predates
   // this session, and dividing it by a young session's runtime invents a 2-minute ETA
   assert.ok(!staleOutput.includes('to limit'));
   assert.strictEqual(depletionEta(18, null, undefined), null);
   // ...and the live path never shows the marker
-  assert.ok(!render(fixture, DEFAULT_CONFIG, remembered, NOW).includes('5h ~'));
+  assert.ok(!render(fixture, DEFAULT_CONFIG, remembered, NOW).includes('5h~'));
 
   // a remembered value is dropped once its own window has reset
   const expired = stateFixture();
@@ -996,7 +1008,7 @@ function selfTest() {
   // ...or, for a window with no reset timestamp, once it is simply too old to trust
   const ageTest = stateFixture();
   assert.strictEqual(ageTest.windows['rate_limits.seven_day'].resetsAt, null);
-  assert.ok(render(noLimits, DEFAULT_CONFIG, ageTest, NOW + 719 * 60).includes('7d ~'));
+  assert.ok(render(noLimits, DEFAULT_CONFIG, ageTest, NOW + 719 * 60).includes('7d~'));
   assert.ok(!render(noLimits, DEFAULT_CONFIG, ageTest, NOW + 721 * 60).includes('7d'));
   // ...and with no memory at all the segment stays hidden, as it always did
   assert.ok(!render(noLimits, DEFAULT_CONFIG, emptyState(), NOW).includes('5h'));
@@ -1060,46 +1072,47 @@ function selfTest() {
   });
   assert.ok(!render(fixture, partialListConfig).includes('7d'));
 
-  // segments sharing a row collapse onto one line joined by layout.joiner
-  const compactConfig = mergeConfig(DEFAULT_CONFIG, {
-    segments: [
-      { id: 'header' },
-      { id: 'ctx', row: 1, showUsage: false },
-      { id: '5h', row: 1, showResetIn: false, showDepletion: false },
-      { id: '7d', row: 1 },
-      { id: 'stats', show: false },
-    ],
-  });
-  const compactLines = render(fixture, compactConfig).split('\n');
-  assert.strictEqual(compactLines.length, 2);
-  assert.strictEqual(compactLines[1].split(' │ ').length, 3);
-  // the default layout still gives every segment its own line
-  assert.strictEqual(render(fixture, DEFAULT_CONFIG).split('\n').length, 5);
+  // the default is two lines: header and stats, then the three bars side by side
+  const defaultLines = render(fixture, DEFAULT_CONFIG).split('\n');
+  assert.strictEqual(defaultLines.length, 2);
+  assert.strictEqual(defaultLines[1].split(' │ ').length, 3);
+  assert.ok(defaultLines[0].includes('$1.23'));
 
-  // short notes trade the words for markers, and drop the context window's fixed size
-  const shortConfig = mergeConfig(DEFAULT_CONFIG, { layout: { noteStyle: 'short' } });
-  const shortOutput = render(fixture, shortConfig);
-  assert.ok(/5h .*18% ↻\dh\dm ~4h33m/.test(shortOutput));
-  assert.ok(shortOutput.includes('ctx') && shortOutput.includes(' 64K') && !shortOutput.includes('64K/200K'));
-  assert.ok(!shortOutput.includes('until reset') && !shortOutput.includes('to limit'));
-  // ...and a segment may keep the long form while the rest go short
-  const mixedOutput = render(fixture, mergeConfig(shortConfig, {
-    segments: [{ id: 'header' }, { id: 'ctx' }, { id: '5h', noteStyle: 'full' }, { id: '7d' }, { id: 'stats' }],
+  // an explicit null row opts back out of a shared line, one segment at a time
+  const stackedLines = render(fixture, mergeConfig(DEFAULT_CONFIG, {
+    segments: [
+      { id: 'header', row: null },
+      { id: 'stats', row: null },
+      { id: 'ctx', row: null, label: 'ctx' },
+      { id: '5h', row: null, label: '5h ' },
+      { id: '7d', row: null, label: '7d ' },
+    ],
+  })).split('\n');
+  assert.strictEqual(stackedLines.length, 5);
+
+  // short notes are the default; the long form is one key away
+  const fullNotes = render(fixture, mergeConfig(DEFAULT_CONFIG, { layout: { noteStyle: 'full' } }));
+  assert.ok(/5h .*\dm until reset, ~4h33m to limit/.test(fullNotes));
+  assert.ok(fullNotes.includes('64K/200K'));
+  // ...and a single segment may keep the long form while the rest stay short
+  const mixedOutput = render(fixture, mergeConfig(DEFAULT_CONFIG, {
+    segments: [{ id: 'header' }, { id: 'stats' }, { id: 'ctx' }, { id: '5h', noteStyle: 'full' }, { id: '7d' }],
   }));
   assert.ok(mixedOutput.includes('until reset'));
+  assert.ok(!/7d .*until reset/.test(mixedOutput));
 
   // custom markers for terminals that can't draw the arrow
   assert.ok(render(fixture, mergeConfig(DEFAULT_CONFIG, {
-    layout: { noteStyle: 'short', noteMarkers: { reset: 'r', limit: 'e' } },
+    layout: { noteMarkers: { reset: 'r', limit: 'e' } },
   })).match(/18% r\dh\dm e4h33m/));
 
   // showBar:false drops the graphic, and the percentage inherits the color it carried
   const noBarConfig = mergeConfig(DEFAULT_CONFIG, {
     segments: [
-      { id: 'header' },
-      { id: 'ctx', showBar: false, showUsage: false },
-      { id: '5h', showBar: false, showResetIn: false, showDepletion: false },
-      { id: '7d', showBar: false, showResetIn: false },
+      { id: 'header', row: null },
+      { id: 'ctx', row: null, showBar: false, showUsage: false },
+      { id: '5h', row: null, showBar: false, showResetIn: false, showDepletion: false },
+      { id: '7d', row: null, showBar: false, showResetIn: false },
       { id: 'stats', show: false },
     ],
   });
@@ -1107,21 +1120,22 @@ function selfTest() {
   assert.strictEqual(noBarLines[1], `ctx ${COLOR_CODES.green}32%${RESET}`);
   assert.ok(!noBarLines[2].includes(DEFAULT_CONFIG.bar.emptyChar));
   // the stale marker still takes the gap's place with no bar to precede
-  assert.ok(render(noLimits, noBarConfig, stateFixture(), NOW + 60).includes(`5h ~${COLOR_CODES.green}18%${RESET}`));
+  assert.ok(render(noLimits, noBarConfig, stateFixture(), NOW + 60).includes(`5h~${COLOR_CODES.green}18%${RESET}`));
 
-  // the fully compact layout: one header line and one line of numbers
+  // everything on one line: the numbers alone still fit a narrow terminal
   const tightLines = render(fixture, mergeConfig(DEFAULT_CONFIG, {
-    layout: { noteStyle: 'short' },
     segments: [
       { id: 'header', row: 1 },
-      { id: 'ctx', row: 2, label: 'ctx', showBar: false, showUsage: false },
-      { id: '5h', row: 2, label: '5h', showBar: false, showDepletion: false },
-      { id: '7d', row: 2, label: '7d', showBar: false },
-      { id: 'stats', row: 1 },
+      { id: 'ctx', row: 1, showBar: false, showUsage: false },
+      { id: '5h', row: 1, showBar: false, showDepletion: false },
+      { id: '7d', row: 1, showBar: false },
+      { id: 'stats', row: 1, parts: [{ key: 'cost' }] },
     ],
   })).split('\n');
-  assert.strictEqual(tightLines.length, 2);
-  assert.ok(tightLines[1].length < 60);
+  assert.strictEqual(tightLines.length, 1);
+  // measuring printed width, so both the color codes and the OSC8 wrappers come off
+  const printed = tightLines[0].replace(/\x1b\]8;;.*?\x1b\\/g, '').replace(/\x1b\[[0-9;]*m/g, '');
+  assert.ok(printed.length < 80, `one-line layout is ${printed.length} columns: ${printed}`);
 
   console.log('self-test OK');
 }
